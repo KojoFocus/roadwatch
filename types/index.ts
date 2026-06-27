@@ -73,10 +73,25 @@ export interface Admin {
 
 // ─── Area ─────────────────────────────────────────────────────────────────────
 export interface Area {
-  id:     string;
-  name:   string;
-  region: string;
-  kw:     string[];
+  id:       string;
+  name:     string;
+  region:   string;
+  district: string;
+  kw:       string[];
+}
+
+// ─── Announcement ─────────────────────────────────────────────────────────────
+export type AnnouncementType = "INFO" | "WARNING" | "ROAD_CLOSURE" | "MAINTENANCE" | "EMERGENCY";
+
+export interface Announcement {
+  id:        string;
+  createdAt: string;
+  title:     string;
+  body:      string;
+  type:      AnnouncementType;
+  region:    string | null;
+  expiresAt: string | null;
+  admin:     { name: string };
 }
 
 export type AreaSafetyScore = "CLEAR" | "ADVISORY" | "CAUTION" | "DANGER";

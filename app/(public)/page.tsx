@@ -51,6 +51,14 @@ const AREAS = [
   { id:"ring-road",     name:"Ring Road",         kw:["ring road","ministries","kokomlemle"] },
 ];
 
+const A_TYPE: Record<string, { color: string; bg: string; border: string; icon: string }> = {
+  INFO:         { color:"#60A5FA", bg:"rgba(96,165,250,0.08)",  border:"rgba(96,165,250,0.2)",  icon:"ℹ️" },
+  WARNING:      { color:"#F59E0B", bg:"rgba(245,158,11,0.08)", border:"rgba(245,158,11,0.22)", icon:"⚠️" },
+  ROAD_CLOSURE: { color:"#EF4444", bg:"rgba(239,68,68,0.08)",  border:"rgba(239,68,68,0.2)",   icon:"🚫" },
+  MAINTENANCE:  { color:"#A78BFA", bg:"rgba(167,139,250,0.08)",border:"rgba(167,139,250,0.2)", icon:"🔧" },
+  EMERGENCY:    { color:"#EF4444", bg:"rgba(239,68,68,0.1)",   border:"rgba(239,68,68,0.3)",   icon:"🚨" },
+};
+
 function ago(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (d < 3600)  return `${Math.floor(d/60)}m`;
@@ -469,9 +477,10 @@ const DEMO_REPORTS = [
 
 // ─── PUBLIC PAGE ──────────────────────────────────────────────────────────────
 export default function PublicPage() {
-  const [reports,   setReports]   = useState<any[]>(DEMO_REPORTS);
-  const [isDemo,    setIsDemo]    = useState(true);
-  const [loading,   setLoading]   = useState(false);
+  const [reports,       setReports]       = useState<any[]>(DEMO_REPORTS);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [isDemo,        setIsDemo]        = useState(true);
+  const [loading,       setLoading]       = useState(false);
   const [tab,       setTab]       = useState("areas");
   const [reporting, setReporting] = useState(false);
   const [areaSearch,setAreaSearch]= useState("");
@@ -492,6 +501,9 @@ export default function PublicPage() {
       .then(j => { if (j.success && j.data.length > 0) { setReports(j.data); setIsDemo(false); } else { setIsDemo(true); } })
       .catch(() => setIsDemo(true))
       .finally(() => setLoading(false));
+    fetch("/api/announcements")
+      .then(r => r.json())
+      .then(j => { if (j.success) setAnnouncements(j.data); });
   }, []);
 
   // PWA install prompt
@@ -581,6 +593,25 @@ export default function PublicPage() {
             </div>
           </div>
           <div style={{ padding:"12px 18px 0" }}>
+            {/* Announcements */}
+            {announcements.length > 0 && (
+              <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:12 }}>
+                {announcements.map(a => {
+                  const at = A_TYPE[a.type] || A_TYPE.INFO;
+                  return (
+                    <div key={a.id} style={{ flexShrink:0, maxWidth:260, background:at.bg, border:`1px solid ${at.border}`, borderRadius:12, padding:"10px 13px" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
+                        <span style={{ fontSize:12 }}>{at.icon}</span>
+                        <span style={{ color:at.color, fontSize:9, fontWeight:800, letterSpacing:1 }}>{a.region || "NATIONAL"}</span>
+                      </div>
+                      <div style={{ color:"#fff", fontWeight:700, fontSize:13, marginBottom:3 }}>{a.title}</div>
+                      <div style={{ color:"#555", fontSize:11, lineHeight:1.5 }}>{a.body}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div style={{ background:"#0D0D0D", border:"1px solid #141414", borderRadius:12, padding:"10px 13px", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ color:"#1e1e1e", fontSize:15 }}>🔍</span>
               <input value={areaSearch} onChange={e => setAreaSearch(e.target.value)} placeholder="Search area or road…" style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"#fff", fontSize:14, fontFamily:"inherit" }}/>
@@ -591,52 +622,60 @@ export default function PublicPage() {
               if (filtered.length === 0) return (
                 <div style={{ textAlign:"center", padding:"36px 0", color:"#1e1e1e" }}>No areas match "{areaSearch}"</div>
               );
-              const scored = filtered
-                .map(a => ({ a, s: areaSafety(a.id, reports) }))
-                .sort((x,y) => { const o={DANGER:0,CAUTION:1,ADVISORY:2,CLEAR:3}; return o[x.s.score as keyof typeof o]-o[y.s.score as keyof typeof o] || y.s.count-x.s.count; });
-              const active = scored.filter(x => x.s.score !== "CLEAR");
-              const clear  = scored.filter(x => x.s.score === "CLEAR");
+
+              const scored = filtered.map(a => ({ a, s: areaSafety(a.id, reports) }));
+              const regions = [...new Set(filtered.map(a => a.region))];
 
               return (
                 <>
-                  {active.length === 0 && (
-                    <div style={{ background:"rgba(34,197,94,0.04)", border:"1px solid rgba(34,197,94,0.12)", borderRadius:16, padding:"28px 20px", textAlign:"center", marginBottom:10 }}>
-                      <div style={{ fontSize:36, marginBottom:10 }}>✅</div>
-                      <div style={{ color:"#22C55E", fontWeight:800, fontSize:16, marginBottom:4 }}>All areas clear</div>
-                      <div style={{ color:"#2a2a2a", fontSize:12, lineHeight:1.6 }}>No active hazards right now.<br/>Tap ⚠️ to report something you see.</div>
-                    </div>
-                  )}
-                  {active.map(({ a, s }) => {
-                    const uniqueTypes = [...new Set(s.reports.map((r:any) => r.hazardType))];
-                    const worstSev = s.reports.some((r:any) => r.severity==="CRITICAL") ? "CRITICAL"
-                      : s.reports.some((r:any) => r.severity==="HIGH") ? "HIGH"
-                      : s.reports.some((r:any) => r.severity==="MEDIUM") ? "MEDIUM" : "LOW";
+                  {regions.map(region => {
+                    const regionAreas = scored.filter(x => x.a.region === region)
+                      .sort((x,y) => { const o={DANGER:0,CAUTION:1,ADVISORY:2,CLEAR:3}; return o[x.s.score as keyof typeof o]-o[y.s.score as keyof typeof o] || y.s.count-x.s.count; });
+                    const active = regionAreas.filter(x => x.s.score !== "CLEAR");
+                    const clear  = regionAreas.filter(x => x.s.score === "CLEAR");
                     return (
-                      <div key={a.id} style={{ background:"#0D0D0D", border:`1px solid ${s.b}`, borderLeft:`3px solid ${s.c}`, borderRadius:14, padding:"14px", marginBottom:8 }}>
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                          <div style={{ color:"#fff", fontWeight:700, fontSize:15 }}>{a.name}</div>
-                          <span style={{ color:s.c, fontSize:10, fontWeight:800, background:s.bg, border:`1px solid ${s.b}`, borderRadius:20, padding:"3px 10px", letterSpacing:.5 }}>{s.label.toUpperCase()}</span>
-                        </div>
-                        <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ color:SC[worstSev], fontSize:10, fontWeight:700 }}>{SEV[worstSev]?.label}</span>
-                          <span style={{ color:"#1e1e1e" }}>·</span>
-                          <span style={{ fontSize:15, letterSpacing:2 }}>{uniqueTypes.map(k => hMeta(k).e).join(" ")}</span>
-                        </div>
+                      <div key={region} style={{ marginBottom:18 }}>
+                        <div style={{ fontSize:8, fontWeight:900, letterSpacing:2.5, color:"#2a2a2a", marginBottom:8, paddingLeft:2 }}>{region.toUpperCase()}</div>
+                        {active.map(({ a, s }) => {
+                          const uniqueTypes = [...new Set(s.reports.map((r:any) => r.hazardType))];
+                          const worstSev = s.reports.some((r:any) => r.severity==="CRITICAL") ? "CRITICAL"
+                            : s.reports.some((r:any) => r.severity==="HIGH") ? "HIGH"
+                            : s.reports.some((r:any) => r.severity==="MEDIUM") ? "MEDIUM" : "LOW";
+                          return (
+                            <div key={a.id} style={{ background:"#0D0D0D", border:`1px solid ${s.b}`, borderLeft:`3px solid ${s.c}`, borderRadius:14, padding:"14px", marginBottom:6 }}>
+                              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                                <div>
+                                  <div style={{ color:"#fff", fontWeight:700, fontSize:14 }}>{a.name}</div>
+                                  <div style={{ color:"#222", fontSize:10, marginTop:1 }}>{a.district}</div>
+                                </div>
+                                <span style={{ color:s.c, fontSize:10, fontWeight:800, background:s.bg, border:`1px solid ${s.b}`, borderRadius:20, padding:"3px 10px", letterSpacing:.5 }}>{s.label.toUpperCase()}</span>
+                              </div>
+                              <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
+                                <span style={{ color:SC[worstSev], fontSize:10, fontWeight:700 }}>{SEV[worstSev]?.label}</span>
+                                <span style={{ color:"#1e1e1e" }}>·</span>
+                                <span style={{ fontSize:14, letterSpacing:2 }}>{uniqueTypes.map(k => hMeta(k).e).join(" ")}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {clear.length > 0 && (
+                          <div style={{ background:"#0A0A0A", border:"1px solid #0F0F0F", borderRadius:12, overflow:"hidden" }}>
+                            {clear.map(({ a }, i) => (
+                              <div key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderTop: i > 0 ? "1px solid #0F0F0F" : "none" }}>
+                                <div>
+                                  <span style={{ color:"#2a2a2a", fontSize:13 }}>{a.name}</span>
+                                  <span style={{ color:"#181818", fontSize:10, marginLeft:6 }}>{a.district}</span>
+                                </div>
+                                <span style={{ color:"#22C55E", fontSize:10, fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
+                                  <span style={{ width:5, height:5, borderRadius:"50%", background:"#22C55E", display:"inline-block" }}/>Clear
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                  {clear.length > 0 && (
-                    <div style={{ background:"#0A0A0A", border:"1px solid #0F0F0F", borderRadius:14, overflow:"hidden", marginBottom:8 }}>
-                      {clear.map(({ a }, i) => (
-                        <div key={a.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"11px 14px", borderTop: i > 0 ? "1px solid #0F0F0F" : "none" }}>
-                          <span style={{ color:"#2a2a2a", fontSize:13 }}>{a.name}</span>
-                          <span style={{ color:"#22C55E", fontSize:10, fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
-                            <span style={{ width:5, height:5, borderRadius:"50%", background:"#22C55E", display:"inline-block" }}/>Clear
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               );
             })()}

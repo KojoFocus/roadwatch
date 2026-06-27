@@ -310,26 +310,57 @@ function dlCSV(rows: any[]) {
   const a    = document.createElement("a"); a.href=url; a.download=`roadwatch-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
+const ANNOUNCE_TYPES: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+  INFO:         { label:"Info",         color:"#60A5FA", bg:"rgba(96,165,250,0.08)",  border:"rgba(96,165,250,0.2)",  icon:"ℹ️" },
+  WARNING:      { label:"Warning",      color:"#F59E0B", bg:"rgba(245,158,11,0.08)", border:"rgba(245,158,11,0.22)", icon:"⚠️" },
+  ROAD_CLOSURE: { label:"Road Closure", color:"#EF4444", bg:"rgba(239,68,68,0.08)",  border:"rgba(239,68,68,0.2)",   icon:"🚫" },
+  MAINTENANCE:  { label:"Maintenance",  color:"#A78BFA", bg:"rgba(167,139,250,0.08)",border:"rgba(167,139,250,0.2)", icon:"🔧" },
+  EMERGENCY:    { label:"Emergency",    color:"#EF4444", bg:"rgba(239,68,68,0.1)",   border:"rgba(239,68,68,0.3)",   icon:"🚨" },
+};
+
+const GH_REGIONS = ["Greater Accra","Ashanti","Western","Central","Eastern","Northern","Upper East","Upper West","Volta","Oti","Bono","Bono East","Ahafo","Savannah","North East","Western North"];
+
 // ─── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [reports,  setReports]  = useState<any[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [tab,      setTab]      = useState("feed");
-  const [filter,   setFilter]   = useState("ALL");
-  const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState<any>(null);
-  const router                  = useRouter();
+  const [reports,       setReports]       = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [tab,           setTab]           = useState("feed");
+  const [filter,        setFilter]        = useState("ALL");
+  const [search,        setSearch]        = useState("");
+  const [selected,      setSelected]      = useState<any>(null);
+  const [aForm,         setAForm]         = useState({ title:"", body:"", type:"INFO", region:"", expiresAt:"" });
+  const [aPosting,      setAPosting]      = useState(false);
+  const router                            = useRouter();
 
   useEffect(() => {
     fetch("/api/reports")
       .then(r => r.json())
       .then(j => { if (j.success) setReports(j.data); })
       .finally(() => setLoading(false));
+    fetch("/api/announcements")
+      .then(r => r.json())
+      .then(j => { if (j.success) setAnnouncements(j.data); });
   }, []);
 
   const logout = async () => { await fetch("/api/auth", { method:"DELETE" }); router.push("/admin/login"); };
 
   const onUpdate = (updated: any) => setReports(p => p.map(r => r.id === updated.id ? { ...updated, upvoteCount: r.upvoteCount } : r));
+
+  const postAnnouncement = async () => {
+    if (!aForm.title.trim() || !aForm.body.trim()) return;
+    setAPosting(true);
+    try {
+      const res  = await fetch("/api/announcements", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(aForm) });
+      const json = await res.json();
+      if (json.success) { setAnnouncements(p => [json.data, ...p]); setAForm({ title:"", body:"", type:"INFO", region:"", expiresAt:"" }); }
+    } finally { setAPosting(false); }
+  };
+
+  const deleteAnnouncement = async (id: string) => {
+    await fetch(`/api/announcements/${id}`, { method:"DELETE" });
+    setAnnouncements(p => p.filter(a => a.id !== id));
+  };
 
   const pending    = reports.filter(r => r.status==="PENDING").length;
   const unverified = reports.filter(r => r.status==="PENDING" && !r.photoUrl).length;
@@ -407,8 +438,11 @@ export default function DashboardPage() {
       {/* Tabs */}
       <div style={{ padding:"12px 18px 0" }}>
         <div style={{ display:"flex", gap:3, background:"#0C0C0C", borderRadius:12, padding:3, border:"1px solid #111", marginBottom:12 }}>
-          {[["feed","📋 Feed"],["map","🗺️ Map"],["analytics","📊"]].map(([key,label]) => (
-            <button key={key} onClick={() => setTab(key)} style={{ flex:key==="analytics"?0:1, background:tab===key?"#EF4444":"transparent", border:"none", borderRadius:9, padding:"10px", color:tab===key?"#fff":"#2a2a2a", fontWeight:800, fontSize:13, fontFamily:"inherit", whiteSpace:"nowrap" as const }}>{label}</button>
+          {[["feed","📋 Feed"],["map","🗺️ Map"],["announce","📢"],["analytics","📊"]].map(([key,label]) => (
+            <button key={key} onClick={() => setTab(key)} style={{ flex:key==="analytics"||key==="announce"?0:1, background:tab===key?"#EF4444":"transparent", border:"none", borderRadius:9, padding:"10px", color:tab===key?"#fff":"#2a2a2a", fontWeight:800, fontSize:13, fontFamily:"inherit", whiteSpace:"nowrap" as const, position:"relative" as const }}>
+              {label}
+              {key==="announce" && announcements.length > 0 && <span style={{ position:"absolute" as const, top:6, right:6, width:6, height:6, borderRadius:"50%", background:"#EF4444", display:"block" }}/>}
+            </button>
           ))}
         </div>
 
@@ -559,6 +593,83 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
+
+        {/* Announce tab */}
+        {tab === "announce" && (
+          <div style={{ animation:"fadeUp .18s ease" }}>
+            {/* Create form */}
+            <div style={{ background:"#0C0C0C", border:"1px solid #111", borderRadius:14, padding:"16px", marginBottom:12 }}>
+              <div style={{ fontSize:9, fontWeight:800, letterSpacing:2, color:"#2a2a2a", marginBottom:12 }}>NEW ANNOUNCEMENT</div>
+
+              {/* Type selector */}
+              <div style={{ display:"flex", gap:5, flexWrap:"wrap" as const, marginBottom:10 }}>
+                {Object.entries(ANNOUNCE_TYPES).map(([k,v]) => (
+                  <button key={k} onClick={() => setAForm(f => ({ ...f, type:k }))}
+                    style={{ background:aForm.type===k?v.bg:"#0A0A0A", border:`1px solid ${aForm.type===k?v.border:"#141414"}`, borderRadius:20, padding:"5px 11px", color:aForm.type===k?v.color:"#333", fontSize:10, fontWeight:700, fontFamily:"inherit" }}>
+                    {v.icon} {v.label}
+                  </button>
+                ))}
+              </div>
+
+              <input value={aForm.title} onChange={e => setAForm(f => ({ ...f, title:e.target.value }))} placeholder="Title"
+                style={{ width:"100%", background:"#0A0A0A", border:"1px solid #141414", borderRadius:10, padding:"11px 13px", color:"#fff", fontSize:14, fontFamily:"inherit", marginBottom:8 }}/>
+
+              <textarea value={aForm.body} onChange={e => setAForm(f => ({ ...f, body:e.target.value }))} placeholder="Message to citizens…" rows={3}
+                style={{ width:"100%", background:"#0A0A0A", border:"1px solid #141414", borderRadius:10, padding:"11px 13px", color:"#fff", fontSize:13, fontFamily:"inherit", resize:"vertical" as const, marginBottom:8 }}/>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
+                <div>
+                  <div style={{ fontSize:9, fontWeight:800, letterSpacing:1.5, color:"#2a2a2a", marginBottom:5 }}>REGION (optional)</div>
+                  <select value={aForm.region} onChange={e => setAForm(f => ({ ...f, region:e.target.value }))}
+                    style={{ width:"100%", background:"#0A0A0A", border:"1px solid #141414", borderRadius:10, padding:"10px 12px", color:aForm.region?"#fff":"#333", fontSize:13, fontFamily:"inherit" }}>
+                    <option value="">National</option>
+                    {GH_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, fontWeight:800, letterSpacing:1.5, color:"#2a2a2a", marginBottom:5 }}>EXPIRES (optional)</div>
+                  <input type="datetime-local" value={aForm.expiresAt} onChange={e => setAForm(f => ({ ...f, expiresAt:e.target.value }))}
+                    style={{ width:"100%", background:"#0A0A0A", border:"1px solid #141414", borderRadius:10, padding:"10px 12px", color:aForm.expiresAt?"#fff":"#333", fontSize:13, fontFamily:"inherit" }}/>
+                </div>
+              </div>
+
+              <button onClick={postAnnouncement} disabled={aPosting || !aForm.title.trim() || !aForm.body.trim()}
+                style={{ width:"100%", background:!aForm.title.trim()||!aForm.body.trim()?"#0A0A0A":"#EF4444", border:"none", borderRadius:11, padding:"13px", color:!aForm.title.trim()||!aForm.body.trim()?"#1e1e1e":"#fff", fontWeight:800, fontSize:14, fontFamily:"inherit" }}>
+                {aPosting ? "Posting…" : "📢 Post Announcement"}
+              </button>
+            </div>
+
+            {/* Active announcements */}
+            {announcements.length === 0
+              ? <div style={{ textAlign:"center", padding:"32px 0", color:"#1a1a1a", fontSize:13 }}>No active announcements</div>
+              : announcements.map(a => {
+                  const at = ANNOUNCE_TYPES[a.type] || ANNOUNCE_TYPES.INFO;
+                  return (
+                    <div key={a.id} style={{ background:"#0C0C0C", border:`1px solid ${at.border}`, borderLeft:`3px solid ${at.color}`, borderRadius:14, padding:"13px 14px", marginBottom:8 }}>
+                      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8 }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                            <span style={{ fontSize:13 }}>{at.icon}</span>
+                            <span style={{ color:at.color, fontSize:9, fontWeight:800, letterSpacing:1 }}>{at.label.toUpperCase()}</span>
+                            <span style={{ color:"#1e1e1e", fontSize:9 }}>·</span>
+                            <span style={{ color:"#333", fontSize:9 }}>{a.region || "National"}</span>
+                          </div>
+                          <div style={{ color:"#fff", fontWeight:700, fontSize:14, marginBottom:4 }}>{a.title}</div>
+                          <div style={{ color:"#444", fontSize:12, lineHeight:1.5 }}>{a.body}</div>
+                          <div style={{ color:"#1a1a1a", fontSize:10, marginTop:6 }}>
+                            {a.admin?.name} · {ago(a.createdAt)} ago
+                            {a.expiresAt && ` · expires ${new Date(a.expiresAt).toLocaleDateString("en-GB")}`}
+                          </div>
+                        </div>
+                        <button onClick={() => deleteAnnouncement(a.id)}
+                          style={{ background:"none", border:"none", color:"#1a1a1a", fontSize:18, lineHeight:1, padding:"0 2px", flexShrink:0 }}>×</button>
+                      </div>
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
 
       {selected && <DetailPanel r={selected} onClose={() => setSelected(null)} onUpdate={onUpdate}/>}
     </div>

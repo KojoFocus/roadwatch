@@ -24,6 +24,8 @@ model Report {
   landmark    String?
   areaId      String?
   region      String   @default("Greater Accra")
+  district    String?  // e.g. "Accra Metropolitan", "Tema Municipal"
+  town        String?  // e.g. "Spintex", "Madina"
 
   // Hazard
   hazardType  HazardType
@@ -48,6 +50,9 @@ model Report {
   // Relations
   upvotes     Upvote[]
   activities  Activity[]
+
+  @@index([region])
+  @@index([district])
 
   @@index([areaId])
   @@index([status])
@@ -85,14 +90,32 @@ model Activity {
 
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
 model Admin {
-  id           String     @id @default(cuid())
-  createdAt    DateTime   @default(now())
-  email        String     @unique
-  passwordHash String
-  name         String
-  role         AdminRole  @default(MODERATOR)
-  lastLogin    DateTime?
-  activities   Activity[]
+  id            String         @id @default(cuid())
+  createdAt     DateTime       @default(now())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          AdminRole      @default(MODERATOR)
+  lastLogin     DateTime?
+  activities    Activity[]
+  announcements Announcement[]
+}
+
+// ─── ANNOUNCEMENT ─────────────────────────────────────────────────────────────
+model Announcement {
+  id        String           @id @default(cuid())
+  createdAt DateTime         @default(now())
+  title     String
+  body      String
+  type      AnnouncementType @default(INFO)
+  region    String?          // null = national
+  expiresAt DateTime?
+  active    Boolean          @default(true)
+  adminId   String
+  admin     Admin            @relation(fields: [adminId], references: [id])
+
+  @@index([active])
+  @@index([createdAt])
 }
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
@@ -126,4 +149,12 @@ enum AdminRole {
   SUPER_ADMIN
   MODERATOR
   VIEWER
+}
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  ROAD_CLOSURE
+  MAINTENANCE
+  EMERGENCY
 }
