@@ -199,7 +199,7 @@ function DetailPanel({ r, onClose, onUpdate }: { r:any; onClose:()=>void; onUpda
           <div style={{background:"rgba(96,165,250,0.05)",border:"1px solid rgba(96,165,250,0.12)",borderRadius:12,padding:"11px 13px",marginBottom:12}}>
             <div style={{color:"#60A5FA",fontSize:11,fontWeight:700,marginBottom:8}}>📤 Forward to Authority</div>
             <div style={{display:"flex",gap:6}}>
-              {(["📱 SMS","sms"],["📧 Email","email"],["💬 WhatsApp","whatsapp"]) && [["📱 SMS","sms"],["📧 Email","email"],["💬 WhatsApp","whatsapp"]].map(([l,t])=>(
+              {[["📱 SMS","sms"],["📧 Email","email"],["💬 WhatsApp","whatsapp"]].map(([l,t])=>(
                 <button key={t} onClick={()=>{const e=encodeURIComponent(fwdMsg);t==="whatsapp"?window.open(`https://wa.me/?text=${e}`):t==="sms"?window.open(`sms:?body=${e}`):window.open(`mailto:?subject=RoadWatch Alert&body=${e}`);}}
                   style={{flex:1,background:"#111",border:"1px solid #141414",borderRadius:9,padding:"8px 5px",color:"#60A5FA",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>{l}</button>
               ))}
