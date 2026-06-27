@@ -552,7 +552,7 @@ export default function PublicPage() {
     : { emoji:"🟡", text:"Minor hazards", c:"#F59E0B", bg:"rgba(245,158,11,0.06)", b:"rgba(245,158,11,0.18)" }
     : result?.matched ? { emoji:"✅", text:"Route looks clear", c:"#22C55E", bg:"rgba(34,197,94,0.06)", b:"rgba(34,197,94,0.18)" } : null;
 
-  const announcements = reports.filter(r => r.status === "RESOLVED" && r.resolutionNote).sort((a:any,b:any) => new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
+  const fixedRoads = reports.filter(r => r.status === "RESOLVED" && r.resolutionNote).sort((a:any,b:any) => new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
   const activeCount   = reports.filter(r => r.status !== "RESOLVED" && r.status !== "DISMISSED" && CONFIDENCE[getConf(r)].showInAreas).length;
 
   return (
@@ -808,9 +808,9 @@ export default function PublicPage() {
       {/* ── FIXED TAB ── */}
       {tab === "fixed" && (
         <div style={{ padding:"16px 18px 0", animation:"fadeUp .18s ease" }}>
-          {announcements.length === 0
+          {fixedRoads.length === 0
             ? <div style={{ textAlign:"center", padding:"48px 0", color:"#1a1a1a", fontSize:14 }}>Nothing resolved yet</div>
-            : announcements.map((r:any) => {
+            : fixedRoads.map((r:any) => {
                 const h   = hMeta(r.hazardType);
                 const hrs = r.resolvedAt ? Math.round((new Date(r.resolvedAt).getTime()-new Date(r.createdAt).getTime())/3600000) : null;
                 return (
