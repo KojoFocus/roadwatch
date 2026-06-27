@@ -397,12 +397,17 @@ export default function PublicPage() {
   const [isDemo,        setIsDemo]        = useState(true);
   const [tab,           setTab]           = useState("feed");
   const [hazardFilter,  setHazardFilter]  = useState("All");
+  const [search,        setSearch]        = useState("");
   const [reporting,     setReporting]     = useState(false);
   const [confirmed,     setConfirmed]     = useState<Record<string,boolean>>({});
   const [gps,           setGps]           = useState<any>({lat:null,lng:null,address:null,status:"idle"});
   const [lang,          setLang]          = useState<Lang>("EN");
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstall,   setShowInstall]   = useState(false);
+  const [routeFrom,     setRouteFrom]     = useState("");
+  const [routeTo,       setRouteTo]       = useState("");
+  const [routeResult,   setRouteResult]   = useState<any[]|null>(null);
+  const [checking,      setChecking]      = useState(false);
 
   useEffect(()=>{
     fetch("/api/reports").then(r=>r.json()).then(j=>{
@@ -434,6 +439,20 @@ export default function PublicPage() {
     setReporting(false);
   };
 
+  const checkRoute=async()=>{
+    if(!routeFrom.trim()||!routeTo.trim()) return;
+    setChecking(true); setRouteResult(null);
+    await new Promise(r=>setTimeout(r,600));
+    const q=[routeFrom,routeTo].map(s=>s.toLowerCase());
+    const hits=reports.filter(r=>{
+      const addr=(r.address||"").toLowerCase();
+      const lm=(r.landmark||"").toLowerCase();
+      const reg=(r.region||"").toLowerCase();
+      return r.status!=="RESOLVED"&&r.status!=="DISMISSED"&&q.some(term=>addr.includes(term)||lm.includes(term)||reg.includes(term));
+    }).sort((a,b)=>SO[a.severity]-SO[b.severity]);
+    setRouteResult(hits); setChecking(false);
+  };
+
   const doConfirm=async(id:string)=>{
     if(confirmed[id]) return;
     setConfirmed(p=>({...p,[id]:true}));
@@ -445,8 +464,10 @@ export default function PublicPage() {
   const fixedReports   = reports.filter(r=>r.status==="RESOLVED"&&r.resolutionNote).sort((a,b)=>new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
   const visibleAnnouncements = announcements.filter(a=>!dismissed.has(a.id));
 
+  const sq = search.trim().toLowerCase();
   const feedReports = activeReports
     .filter(r=>hazardFilter==="All"||r.hazardType===hazardFilter)
+    .filter(r=>!sq||[(r.address||""),(r.landmark||""),(r.region||"")].some(f=>f.toLowerCase().includes(sq)))
     .sort((a,b)=>SO[a.severity]-SO[b.severity]||new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
 
   const criticalCount = activeReports.filter(r=>r.severity==="CRITICAL").length;
@@ -524,6 +545,14 @@ export default function PublicPage() {
               </div>
             )}
 
+            {/* Search bar */}
+            <div style={{position:"relative" as const,marginBottom:10}}>
+              <span style={{position:"absolute" as const,left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" as const}}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
+                style={{width:"100%",background:"#0D0D0D",border:"1px solid #141414",borderRadius:12,padding:"10px 12px 10px 34px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#333",fontSize:16,lineHeight:1}}>×</button>}
+            </div>
+
             {/* Hazard type filters */}
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginBottom:12}}>
               {[{key:"All",e:"◈",label:"All"},...H].map(h=>(
@@ -573,6 +602,55 @@ export default function PublicPage() {
         </div>
       )}
 
+      {/* ── ROUTE TAB ── */}
+      {tab==="route"&&(
+        <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
+          <div style={{marginBottom:18}}>
+            <div style={{color:"#fff",fontWeight:900,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
+            <div style={{color:"#444",fontSize:13}}>See active hazard reports along any road.</div>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:12}}>
+            <div style={{position:"relative" as const}}>
+              <span style={{position:"absolute" as const,left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#22C55E"}}>⬤</span>
+              <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} placeholder="From — e.g. Spintex Road"
+                style={{width:"100%",background:"#0D0D0D",border:"1px solid #141414",borderRadius:12,padding:"13px 12px 13px 34px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+            </div>
+            <div style={{position:"relative" as const}}>
+              <span style={{position:"absolute" as const,left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#EF4444"}}>⬤</span>
+              <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} placeholder="To — e.g. Tema Motorway"
+                style={{width:"100%",background:"#0D0D0D",border:"1px solid #141414",borderRadius:12,padding:"13px 12px 13px 34px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+            </div>
+            <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
+              style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#2a2a2a",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {checking?<><div style={{width:16,height:16,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>🔍 Check Route</>}
+            </button>
+          </div>
+
+          {routeResult!==null&&(
+            <div style={{animation:"fadeUp .18s ease"}}>
+              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#2a2a2a",marginBottom:10}}>
+                {routeResult.length===0?"NO HAZARDS FOUND":`${routeResult.length} HAZARD${routeResult.length!==1?"S":""} ALONG THIS ROUTE`}
+              </div>
+              {routeResult.length===0
+                ?<div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.12)",borderRadius:14,padding:"24px",textAlign:"center" as const}}>
+                  <div style={{fontSize:36,marginBottom:10}}>✅</div>
+                  <div style={{color:"#22C55E",fontWeight:700,fontSize:15,marginBottom:4}}>Route looks clear</div>
+                  <div style={{color:"#2a2a2a",fontSize:12}}>No citizen reports for these roads right now.</div>
+                </div>
+                :routeResult.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
+              }
+            </div>
+          )}
+
+          {routeResult===null&&!checking&&(
+            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#1a1a1a",fontSize:13}}>
+              Enter a start and end point above to check for hazards.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* PWA install banner */}
       {showInstall&&(
         <div style={{position:"fixed" as const,bottom:76,left:12,right:12,zIndex:105,background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease"}}>
@@ -619,21 +697,26 @@ export default function PublicPage() {
         </div>
       )}
 
-      {/* Bottom nav */}
-      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #0F0F0F",padding:"9px 0 20px",display:"flex",justifyContent:"space-around",backdropFilter:"blur(20px)",zIndex:99}}>
-        {[["feed","📋","Feed"],["fixed","✅","Fixed"]].map(([key,icon,label])=>(
-          <button key={key} onClick={()=>setTab(key)} style={{background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:2,fontFamily:"inherit",minWidth:80}}>
+      {/* Bottom nav: Feed | Route | 🚨 | Fixed */}
+      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #0F0F0F",padding:"9px 0 20px",display:"flex",alignItems:"center",justifyContent:"space-around",backdropFilter:"blur(20px)",zIndex:99}}>
+        {[["feed","📋","Feed"],["route","🗺️","Route"]].map(([key,icon,label])=>(
+          <button key={key} onClick={()=>setTab(key)} style={{background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:2,fontFamily:"inherit",flex:1}}>
             <span style={{fontSize:21}}>{icon}</span>
             <span style={{fontSize:8,fontWeight:900,letterSpacing:.8,color:tab===key?"#EF4444":"#1e1e1e"}}>{label.toUpperCase()}</span>
           </button>
         ))}
-        {/* Centre report button */}
+        {/* Centre report FAB */}
         <button onClick={onReport}
-          style={{background:"#EF4444",border:"none",borderRadius:"50%",width:56,height:56,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative" as const,top:-14,boxShadow:"0 4px 20px rgba(239,68,68,0.5)"}}>
+          style={{background:"#EF4444",border:"3px solid #0A0A0A",borderRadius:"50%",width:60,height:60,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative" as const,top:-16,boxShadow:"0 4px 24px rgba(239,68,68,0.55)",flexShrink:0}}>
           🚨
         </button>
-        <div style={{minWidth:80}}/>
-        <div style={{minWidth:80}}/>
+        {[["fixed","✅","Fixed"]].map(([key,icon,label])=>(
+          <button key={key} onClick={()=>setTab(key)} style={{background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:2,fontFamily:"inherit",flex:1}}>
+            <span style={{fontSize:21}}>{icon}</span>
+            <span style={{fontSize:8,fontWeight:900,letterSpacing:.8,color:tab===key?"#EF4444":"#1e1e1e"}}>{label.toUpperCase()}</span>
+          </button>
+        ))}
+        <div style={{flex:1}}/>
       </div>
     </div>
   );
