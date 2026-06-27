@@ -417,7 +417,7 @@ export default function PublicPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [dismissed,     setDismissed]     = useState<Set<string>>(new Set());
   const [isDemo,        setIsDemo]        = useState(true);
-  const [tab,           setTab]           = useState("feed");
+  const [tab,           setTab]           = useState("map");
   const [hazardFilter,  setHazardFilter]  = useState("All");
   const [search,        setSearch]        = useState("");
   const [reporting,     setReporting]     = useState(false);
@@ -786,8 +786,8 @@ export default function PublicPage() {
       {/* ── BOTTOM NAV ── */}
       {/* Grid: [Feed][Route][FAB-center][Fixed][ghost] — FAB at column 3/5 = true center */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #111",paddingBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr 56px 1fr 1fr",alignItems:"end",backdropFilter:"blur(20px)",zIndex:99}}>
-        <div style={{padding:"9px 0 0"}}><NavBtn tKey="feed"  icon="📋" label="Feed"/></div>
         <div style={{padding:"9px 0 0"}}><NavBtn tKey="map"   icon="🗺️" label="Map"/></div>
+        <div style={{padding:"9px 0 0"}}><NavBtn tKey="feed"  icon="📋" label="Feed"/></div>
         {/* Centre FAB — raised above nav */}
         <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",paddingBottom:0}}>
           <button onClick={onReport}
