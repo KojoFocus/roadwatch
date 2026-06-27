@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic                          from "next/dynamic";
 import { uploadPhoto, uploadAudio }     from "@/lib/supabase";
+import { AREAS }                        from "@/lib/areas";
 
 const RouteMapGL = dynamic(() => import("@/components/RouteMapGL"), { ssr: false });
 
@@ -40,16 +41,6 @@ const SEV: Record<string, any> = {
 const SC: Record<string, string> = { CRITICAL:"#EF4444", HIGH:"#F97316", MEDIUM:"#F59E0B", LOW:"#22C55E" };
 const SO: Record<string, number> = { CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 };
 
-const AREAS = [
-  { id:"spintex",       name:"Spintex Road",      kw:["spintex","baatsona","community 18"] },
-  { id:"adenta",        name:"Adenta · Madina",   kw:["adenta","madina","oyarifa","teiman"] },
-  { id:"accra-central", name:"Accra Central",     kw:["accra central","circle","kwame nkrumah","makola","high street"] },
-  { id:"tema",          name:"Tema Motorway",     kw:["tema","ashaiman","motorway"] },
-  { id:"kumasi-road",   name:"Kumasi Road",       kw:["kumasi","ofankor","pokuase","nsawam","suhum"] },
-  { id:"haatso",        name:"Haatso · Atomic",   kw:["haatso","atomic","legon","east legon"] },
-  { id:"liberation",    name:"Liberation Road",   kw:["liberation","airport","labadi"] },
-  { id:"ring-road",     name:"Ring Road",         kw:["ring road","ministries","kokomlemle"] },
-];
 
 const A_TYPE: Record<string, { color: string; bg: string; border: string; icon: string }> = {
   INFO:         { color:"#60A5FA", bg:"rgba(96,165,250,0.08)",  border:"rgba(96,165,250,0.2)",  icon:"ℹ️" },
