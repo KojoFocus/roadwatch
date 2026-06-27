@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/icons/icon-192.png", destination: "/icons/icon-192.svg", permanent: false },
+      { source: "/icons/icon-512.png", destination: "/icons/icon-512.svg", permanent: false },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
