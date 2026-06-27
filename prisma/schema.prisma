@@ -1,0 +1,129 @@
+// RoadWatch Ghana — Prisma Schema
+// Free stack: PostgreSQL on Neon
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── REPORT ───────────────────────────────────────────────────────────────────
+model Report {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Location
+  latitude    Float
+  longitude   Float
+  address     String
+  landmark    String?
+  areaId      String?
+  region      String   @default("Greater Accra")
+
+  // Hazard
+  hazardType  HazardType
+  severity    Severity
+  description String?
+
+  // Media
+  photoUrl    String?   // Supabase Storage URL
+  voiceUrl    String?   // Supabase Storage URL (original audio)
+  transcript  String?   // Gemini transcription
+
+  // Identity
+  reporter    String?   // hashed phone or "Anonymous"
+
+  // Status lifecycle
+  status         ReportStatus @default(PENDING)
+  resolvedAt     DateTime?
+  resolutionNote String?
+  fixedBy        String?
+  adminNote      String?
+
+  // Relations
+  upvotes     Upvote[]
+  activities  Activity[]
+
+  @@index([areaId])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([latitude, longitude])
+}
+
+// ─── UPVOTE ───────────────────────────────────────────────────────────────────
+model Upvote {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  reportId    String
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  fingerprint String   // browser fingerprint to prevent double-voting
+
+  @@unique([reportId, fingerprint])
+  @@index([reportId])
+}
+
+// ─── ACTIVITY LOG ─────────────────────────────────────────────────────────────
+// Tracks every status change for audit trail
+model Activity {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  adminId   String?
+  admin     Admin?   @relation(fields: [adminId], references: [id])
+  action    String   // e.g. "STATUS_CHANGED", "FORWARDED", "NOTE_ADDED"
+  detail    String?  // e.g. "PENDING → VERIFIED"
+
+  @@index([reportId])
+}
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+model Admin {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         AdminRole  @default(MODERATOR)
+  lastLogin    DateTime?
+  activities   Activity[]
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+enum HazardType {
+  POTHOLE
+  FLOOD
+  ACCIDENT
+  DEBRIS
+  BROKEN_LIGHT
+  ROAD_BLOCK
+  DANGEROUS_ANIMAL
+  OTHER
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  MODERATOR
+  VIEWER
+}
