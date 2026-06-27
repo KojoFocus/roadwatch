@@ -1,7 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { uploadPhoto } from "@/lib/supabase";
+import dynamic                          from "next/dynamic";
+import { uploadPhoto }                  from "@/lib/supabase";
+
+const MapView = dynamic(() => import("@/components/public/MapView"), {
+  ssr:     false,
+  loading: () => (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:"#555",fontSize:13,gap:8}}>
+      <div style={{width:16,height:16,border:"2px solid #1e1e1e",borderTopColor:"#EF4444",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+      Loading map…
+    </div>
+  ),
+});
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const H = [
@@ -327,15 +338,22 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
 
 // ─── DEMO DATA ────────────────────────────────────────────────────────────────
 const DEMO_REPORTS = [
-  {id:"d1",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:14,address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-7200000).toISOString(),  resolvedAt:null},
-  {id:"d2",hazardType:"FLOOD",       severity:"HIGH",    status:"IN_REVIEW", photoUrl:"https://images.unsplash.com/photo-1574482620826-40685ca5eef2?w=600&q=80",upvoteCount:9, address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-3600000).toISOString(),  resolvedAt:null},
-  {id:"d3",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:7, address:"Tema Motorway",     region:"Greater Accra",createdAt:new Date(Date.now()-10800000).toISOString(),resolvedAt:null},
-  {id:"d4",hazardType:"ROAD_BLOCK",  severity:"HIGH",    status:"VERIFIED",  photoUrl:null,                                                                                    upvoteCount:5, address:"Atomic Junction",   region:"Greater Accra",createdAt:new Date(Date.now()-1800000).toISOString(),  resolvedAt:null},
-  {id:"d5",hazardType:"BROKEN_LIGHT",severity:"MEDIUM",  status:"PENDING",   photoUrl:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",  upvoteCount:3, address:"Kwame Nkrumah Ave", region:"Greater Accra",createdAt:new Date(Date.now()-900000).toISOString(),   resolvedAt:null},
-  {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  photoUrl:null,                                                                                    upvoteCount:2, address:"Ring Road Central", region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
+  {id:"d1",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6448,longitude:-0.0918,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:14,address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-7200000).toISOString(),  resolvedAt:null},
+  {id:"d2",hazardType:"FLOOD",       severity:"HIGH",    status:"IN_REVIEW", latitude:5.6412,longitude:-0.0882,photoUrl:"https://images.unsplash.com/photo-1574482620826-40685ca5eef2?w=600&q=80",upvoteCount:9, address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-3600000).toISOString(),  resolvedAt:null},
+  {id:"d3",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6320,longitude:-0.0231,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:7, address:"Tema Motorway",     region:"Greater Accra",createdAt:new Date(Date.now()-10800000).toISOString(),resolvedAt:null},
+  {id:"d4",hazardType:"ROAD_BLOCK",  severity:"HIGH",    status:"VERIFIED",  latitude:5.6439,longitude:-0.2366,photoUrl:null,                                                                        upvoteCount:5, address:"Atomic Junction",   region:"Greater Accra",createdAt:new Date(Date.now()-1800000).toISOString(),  resolvedAt:null},
+  {id:"d5",hazardType:"BROKEN_LIGHT",severity:"MEDIUM",  status:"PENDING",   latitude:5.5487,longitude:-0.2077,photoUrl:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",upvoteCount:3, address:"Kwame Nkrumah Ave", region:"Greater Accra",createdAt:new Date(Date.now()-900000).toISOString(),   resolvedAt:null},
+  {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  latitude:5.5578,longitude:-0.2040,photoUrl:null,                                                                        upvoteCount:2, address:"Ring Road Central", region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
 ];
 
 // ─── REPORT CARD ──────────────────────────────────────────────────────────────
+function shareWhatsApp(r: any) {
+  const h    = hMeta(r.hazardType);
+  const sev  = SEV_LABEL[r.severity] || r.severity;
+  const text = `🚨 ${sev.toUpperCase()} ROAD HAZARD\n${h.e} ${h.label} — ${r.address}, Ghana.\n\n${r.upvoteCount || 0} citizens confirmed this.\n\nRoadWatch Ghana: roadwatch-eight-pi.vercel.app`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+}
+
 function ReportCard({ r, confirmed, onConfirm }: { r:any; confirmed:boolean; onConfirm:()=>void }) {
   const h       = hMeta(r.hazardType);
   const isFixed = r.status==="RESOLVED";
@@ -377,10 +395,17 @@ function ReportCard({ r, confirmed, onConfirm }: { r:any; confirmed:boolean; onC
           <span style={{color:"#333",fontSize:10}}>·</span>
           <span style={{color:"#555",fontSize:10,marginLeft:"auto"}}>{ago(r.createdAt)}</span>
         </div>
-        <button onClick={onConfirm} disabled={confirmed}
-          style={{width:"100%",background:confirmed?"rgba(34,197,94,0.08)":"#141414",border:`1px solid ${confirmed?"rgba(34,197,94,0.25)":"#222"}`,borderRadius:10,padding:"11px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          {confirmed?<>✓ You confirmed this</>:<>👍 I can confirm this · {r.upvoteCount||0}</>}
-        </button>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={onConfirm} disabled={confirmed}
+            style={{flex:1,background:confirmed?"rgba(34,197,94,0.08)":"#141414",border:`1px solid ${confirmed?"rgba(34,197,94,0.25)":"#222"}`,borderRadius:10,padding:"11px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            {confirmed?<>✓ Confirmed</>:<>👍 Confirm · {r.upvoteCount||0}</>}
+          </button>
+          <button onClick={()=>shareWhatsApp(r)}
+            style={{background:"#141414",border:"1px solid #222",borderRadius:10,padding:"11px 13px",color:"#25D366",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}
+            title="Share on WhatsApp">
+            📤
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -507,7 +532,7 @@ export default function PublicPage() {
             {criticalCount>0&&(
               <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",borderRadius:10,padding:"9px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:14}}>🔴</span>
-                <span style={{color:"#EF4444",fontSize:12,fontWeight:700}}>{criticalCount} critical hazard{criticalCount!==1?"s":""} on Ghana's roads right now</span>
+                <span style={{color:"#EF4444",fontSize:12,fontWeight:700}}>{criticalCount} critical {criticalCount!==1?"hazards":"hazard"} on Ghana's roads right now</span>
               </div>
             )}
             <div style={{color:"#888",fontSize:13,marginBottom:8}}>See a road hazard?</div>
@@ -640,6 +665,58 @@ export default function PublicPage() {
         </div>
       )}
 
+      {/* ══ MAP TAB ══ */}
+      {tab==="map"&&(
+        <div style={{position:"fixed" as const,top:56,bottom:72,left:0,right:0}}>
+          {/* Route check drawer at top of map */}
+          <div style={{position:"absolute" as const,top:0,left:0,right:0,zIndex:10,background:"rgba(5,5,5,0.92)",backdropFilter:"blur(12px)",borderBottom:"1px solid #111",padding:"10px 14px"}}>
+            <div style={{display:"flex",gap:7}}>
+              <div style={{flex:1,position:"relative" as const}}>
+                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#22C55E"}}/>
+                <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+                  placeholder="From"
+                  style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+              </div>
+              <div style={{flex:1,position:"relative" as const}}>
+                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#EF4444"}}/>
+                <input value={routeTo} onChange={e=>setRouteTo(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+                  placeholder="To"
+                  style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+              </div>
+              <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
+                style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:10,padding:"9px 14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#333",fontWeight:700,fontSize:13,fontFamily:"inherit",flexShrink:0}}>
+                {checking?<div style={{width:14,height:14,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>:"🔍"}
+              </button>
+            </div>
+            {routeResult!==null&&(
+              <div style={{marginTop:6,fontSize:10,fontWeight:700,letterSpacing:1.5,color:routeResult.length===0?"#22C55E":"#F59E0B"}}>
+                {routeResult.length===0?"✓ NO HAZARDS FOUND ON THIS ROUTE":`⚠ ${routeResult.length} HAZARD${routeResult.length!==1?"S":""} FOUND — CHECK PINS ON MAP`}
+              </div>
+            )}
+          </div>
+          {/* Map fills remaining space */}
+          <div style={{position:"absolute" as const,top:routeResult!==null?86:54,bottom:0,left:0,right:0}}>
+            <MapView
+              reports={routeResult!==null?routeResult:reports}
+              hazardFilter={hazardFilter}
+              onConfirm={doConfirm}
+              confirmed={confirmed}
+            />
+          </div>
+          {/* Filter pills overlay */}
+          <div style={{position:"absolute" as const,bottom:10,left:12,right:0,zIndex:10,display:"flex",gap:5,overflowX:"auto" as const,paddingRight:12}}>
+            {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
+              <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
+                style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(239,68,68,0.9)":"rgba(5,5,5,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${hazardFilter===hx.key?"#EF4444":"rgba(255,255,255,0.08)"}`,borderRadius:20,padding:"5px 11px",color:hazardFilter===hx.key?"#fff":"#aaa",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+                {hx.e} {hx.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ══ FIXED TAB ══ */}
       {tab==="fixed"&&(
         <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
@@ -710,7 +787,7 @@ export default function PublicPage() {
       {/* Grid: [Feed][Route][FAB-center][Fixed][ghost] — FAB at column 3/5 = true center */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #111",paddingBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr 56px 1fr 1fr",alignItems:"end",backdropFilter:"blur(20px)",zIndex:99}}>
         <div style={{padding:"9px 0 0"}}><NavBtn tKey="feed"  icon="📋" label="Feed"/></div>
-        <div style={{padding:"9px 0 0"}}><NavBtn tKey="route" icon="🗺️" label="Route"/></div>
+        <div style={{padding:"9px 0 0"}}><NavBtn tKey="map"   icon="🗺️" label="Map"/></div>
         {/* Centre FAB — raised above nav */}
         <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",paddingBottom:0}}>
           <button onClick={onReport}
