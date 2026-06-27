@@ -327,6 +327,8 @@ export default function DashboardPage() {
   const [loading,       setLoading]       = useState(true);
   const [tab,           setTab]           = useState("feed");
   const [filter,        setFilter]        = useState("ALL");
+  const [regionFilter,  setRegionFilter]  = useState("ALL");
+  const [sevFilter,     setSevFilter]     = useState("ALL");
   const [search,        setSearch]        = useState("");
   const [selected,      setSelected]      = useState<any>(null);
   const [aForm,         setAForm]         = useState({ title:"", body:"", type:"INFO", region:"", expiresAt:"" });
@@ -378,6 +380,8 @@ export default function DashboardPage() {
     { k:"FLOOD",      l:"🌊" },
   ];
 
+  const activeRegions = ["ALL", ...new Set<string>(reports.map(r => r.region).filter(Boolean))].sort((a,b) => a==="ALL"?-1:a.localeCompare(b));
+
   const filtered = reports
     .filter(r => {
       if (filter==="ALL")        return true;
@@ -388,7 +392,9 @@ export default function DashboardPage() {
       if (filter==="RESOLVED")   return r.status==="RESOLVED";
       return r.hazardType === filter;
     })
-    .filter(r => !search || (r.address+r.landmark+r.hazardType).toLowerCase().includes(search.toLowerCase()))
+    .filter(r => regionFilter === "ALL" || r.region === regionFilter)
+    .filter(r => sevFilter    === "ALL" || r.severity === sevFilter)
+    .filter(r => !search || (r.address+(r.landmark||"")+(r.hazardType||"")+(r.region||"")).toLowerCase().includes(search.toLowerCase()))
     .sort((a,b) => SO[a.severity]-SO[b.severity]);
 
   const topAlert = critical > 0
@@ -448,13 +454,35 @@ export default function DashboardPage() {
 
         {loading && <div style={{ textAlign:"center", padding:"40px 0", color:"#2a2a2a", fontSize:14 }}>Loading reports…</div>}
 
+        {/* Shared region + severity filters (feed & map) */}
+        {!loading && (tab === "feed" || tab === "map") && (
+          <div style={{ marginBottom:10 }}>
+            <div style={{ display:"flex", gap:5, overflowX:"auto", paddingBottom:4, marginBottom:6 }}>
+              {activeRegions.map(r => (
+                <button key={r} onClick={() => setRegionFilter(r)}
+                  style={{ flexShrink:0, background:regionFilter===r?"#EF4444":"#0C0C0C", border:`1px solid ${regionFilter===r?"#EF4444":"#111"}`, borderRadius:20, padding:"5px 12px", color:regionFilter===r?"#fff":"#2a2a2a", fontSize:10, fontWeight:700, fontFamily:"inherit", whiteSpace:"nowrap" as const }}>
+                  {r === "ALL" ? "All Regions" : r}
+                </button>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:5, overflowX:"auto", paddingBottom:4 }}>
+              {[{k:"ALL",l:"All Severity"},{k:"CRITICAL",l:"🔴 Critical"},{k:"HIGH",l:"🟠 High"},{k:"MEDIUM",l:"🟡 Moderate"},{k:"LOW",l:"🟢 Low"}].map(s => (
+                <button key={s.k} onClick={() => setSevFilter(s.k)}
+                  style={{ flexShrink:0, background:sevFilter===s.k?"rgba(239,68,68,0.15)":"#0C0C0C", border:`1px solid ${sevFilter===s.k?"rgba(239,68,68,0.35)":"#111"}`, borderRadius:20, padding:"5px 12px", color:sevFilter===s.k?"#EF4444":"#2a2a2a", fontSize:10, fontWeight:700, fontFamily:"inherit", whiteSpace:"nowrap" as const }}>
+                  {s.l}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Map tab */}
         {!loading && tab === "map" && (
           <>
             <div style={{ borderRadius:16, overflow:"hidden", marginBottom:12, border:"1px solid #111", height:320 }}>
-              <AdminMapGL reports={reports} selectedId={selected?.id} onSelect={r => setSelected(r)}/>
+              <AdminMapGL reports={filtered} selectedId={selected?.id} onSelect={r => setSelected(r)}/>
             </div>
-            {reports.filter(r => r.status!=="RESOLVED"&&r.status!=="DISMISSED").sort((a,b) => SO[a.severity]-SO[b.severity]).map(r => (
+            {filtered.filter(r => r.status!=="RESOLVED"&&r.status!=="DISMISSED").map(r => (
               <ReportCard key={r.id} r={r} selected={selected?.id===r.id} onClick={() => setSelected(selected?.id===r.id?null:r)}/>
             ))}
           </>
@@ -465,7 +493,7 @@ export default function DashboardPage() {
           <>
             <div style={{ background:"#0C0C0C", border:"1px solid #111", borderRadius:11, padding:"10px 13px", marginBottom:8, display:"flex", alignItems:"center", gap:7 }}>
               <span style={{ color:"#1a1a1a", fontSize:14 }}>🔍</span>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"#fff", fontSize:14, fontFamily:"inherit" }}/>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search reports…" style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"#fff", fontSize:14, fontFamily:"inherit" }}/>
               {search && <button onClick={() => setSearch("")} style={{ background:"none", border:"none", color:"#2a2a2a", fontSize:18 }}>×</button>}
             </div>
             <div style={{ display:"flex", gap:5, overflowX:"auto", paddingBottom:6, marginBottom:10 }}>

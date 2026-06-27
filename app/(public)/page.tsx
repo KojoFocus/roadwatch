@@ -481,6 +481,8 @@ export default function PublicPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isDemo,        setIsDemo]        = useState(true);
   const [loading,       setLoading]       = useState(false);
+  const [regionFilter,  setRegionFilter]  = useState("All");
+  const [hazardFilter,  setHazardFilter]  = useState("All");
   const [tab,       setTab]       = useState("areas");
   const [reporting, setReporting] = useState(false);
   const [areaSearch,setAreaSearch]= useState("");
@@ -612,35 +614,73 @@ export default function PublicPage() {
               </div>
             )}
 
+            {/* Region filter */}
+            {(() => {
+              const allRegions = [...new Set(AREAS.map(a => a.region))].sort();
+              return (
+                <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, marginBottom:8 }}>
+                  {["All", ...allRegions].map(r => (
+                    <button key={r} onClick={() => { setRegionFilter(r); setAreaSearch(""); }}
+                      style={{ flexShrink:0, background:regionFilter===r?"#EF4444":"#0D0D0D", border:`1px solid ${regionFilter===r?"#EF4444":"#141414"}`, borderRadius:20, padding:"6px 13px", color:regionFilter===r?"#fff":"#333", fontSize:11, fontWeight:700, fontFamily:"inherit" }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Hazard type filter */}
+            <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, marginBottom:10 }}>
+              {[{ key:"All", e:"◈", label:"All" }, ...H.map(h => ({ key:h.key, e:h.e, label:h.label }))].map(h => (
+                <button key={h.key} onClick={() => setHazardFilter(h.key)}
+                  style={{ flexShrink:0, background:hazardFilter===h.key?"rgba(239,68,68,0.12)":"#0D0D0D", border:`1px solid ${hazardFilter===h.key?"rgba(239,68,68,0.3)":"#141414"}`, borderRadius:20, padding:"6px 12px", color:hazardFilter===h.key?"#EF4444":"#333", fontSize:11, fontWeight:700, fontFamily:"inherit" }}>
+                  {h.e} {h.label}
+                </button>
+              ))}
+            </div>
+
             <div style={{ background:"#0D0D0D", border:"1px solid #141414", borderRadius:12, padding:"10px 13px", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ color:"#1e1e1e", fontSize:15 }}>🔍</span>
               <input value={areaSearch} onChange={e => setAreaSearch(e.target.value)} placeholder="Search area or road…" style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"#fff", fontSize:14, fontFamily:"inherit" }}/>
               {areaSearch && <button onClick={() => setAreaSearch("")} style={{ background:"none", border:"none", color:"#333", fontSize:18 }}>×</button>}
             </div>
             {(() => {
-              const filtered = AREAS.filter(a => !areaSearch || a.name.toLowerCase().includes(areaSearch.toLowerCase()) || a.kw.some(k => k.includes(areaSearch.toLowerCase())));
-              if (filtered.length === 0) return (
-                <div style={{ textAlign:"center", padding:"36px 0", color:"#1e1e1e" }}>No areas match "{areaSearch}"</div>
+              const bySearch = AREAS.filter(a =>
+                (!areaSearch || a.name.toLowerCase().includes(areaSearch.toLowerCase()) || a.kw.some(k => k.includes(areaSearch.toLowerCase()))) &&
+                (regionFilter === "All" || a.region === regionFilter)
+              );
+              if (bySearch.length === 0) return (
+                <div style={{ textAlign:"center", padding:"36px 0", color:"#1e1e1e" }}>No areas match your filters</div>
               );
 
-              const scored = filtered.map(a => ({ a, s: areaSafety(a.id, reports) }));
-              const regions = [...new Set(filtered.map(a => a.region))];
+              const scored = bySearch.map(a => {
+                const s = areaSafety(a.id, reports);
+                const matchesHazard = hazardFilter === "All" || s.reports.some((r:any) => r.hazardType === hazardFilter);
+                return { a, s, matchesHazard };
+              });
+              const regions = [...new Set(bySearch.map(a => a.region))];
 
               return (
                 <>
                   {regions.map(region => {
-                    const regionAreas = scored.filter(x => x.a.region === region)
+                    const regionAreas = scored
+                      .filter(x => x.a.region === region)
                       .sort((x,y) => { const o={DANGER:0,CAUTION:1,ADVISORY:2,CLEAR:3}; return o[x.s.score as keyof typeof o]-o[y.s.score as keyof typeof o] || y.s.count-x.s.count; });
-                    const active = regionAreas.filter(x => x.s.score !== "CLEAR");
-                    const clear  = regionAreas.filter(x => x.s.score === "CLEAR");
+
+                    const active = regionAreas.filter(x => x.s.score !== "CLEAR" && x.matchesHazard);
+                    const clear  = hazardFilter === "All" ? regionAreas.filter(x => x.s.score === "CLEAR") : [];
+
+                    if (active.length === 0 && clear.length === 0) return null;
+
                     return (
                       <div key={region} style={{ marginBottom:18 }}>
                         <div style={{ fontSize:8, fontWeight:900, letterSpacing:2.5, color:"#2a2a2a", marginBottom:8, paddingLeft:2 }}>{region.toUpperCase()}</div>
                         {active.map(({ a, s }) => {
-                          const uniqueTypes = [...new Set(s.reports.map((r:any) => r.hazardType))];
-                          const worstSev = s.reports.some((r:any) => r.severity==="CRITICAL") ? "CRITICAL"
-                            : s.reports.some((r:any) => r.severity==="HIGH") ? "HIGH"
-                            : s.reports.some((r:any) => r.severity==="MEDIUM") ? "MEDIUM" : "LOW";
+                          const visibleReports = hazardFilter === "All" ? s.reports : s.reports.filter((r:any) => r.hazardType === hazardFilter);
+                          const uniqueTypes    = [...new Set(visibleReports.map((r:any) => r.hazardType))];
+                          const worstSev = visibleReports.some((r:any) => r.severity==="CRITICAL") ? "CRITICAL"
+                            : visibleReports.some((r:any) => r.severity==="HIGH") ? "HIGH"
+                            : visibleReports.some((r:any) => r.severity==="MEDIUM") ? "MEDIUM" : "LOW";
                           return (
                             <div key={a.id} style={{ background:"#0D0D0D", border:`1px solid ${s.b}`, borderLeft:`3px solid ${s.c}`, borderRadius:14, padding:"14px", marginBottom:6 }}>
                               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
