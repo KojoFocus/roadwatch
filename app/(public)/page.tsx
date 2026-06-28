@@ -589,15 +589,7 @@ export default function PublicPage() {
             </div>
 
             {/* Section label */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555"}}>CITIZEN REPORTS · {feedReports.length}</div>
-              {fixedReports.length>0&&(
-                <button onClick={()=>setTab("fixed")}
-                  style={{background:"none",border:"none",color:"#22C55E",fontSize:11,fontWeight:700,fontFamily:"inherit",padding:0}}>
-                  ✅ {fixedReports.length} fixed →
-                </button>
-              )}
-            </div>
+            <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555",marginBottom:10}}>CITIZEN REPORTS · {feedReports.length}</div>
 
             {feedReports.length===0
               ?<div style={{textAlign:"center" as const,padding:"48px 0"}}>
@@ -608,6 +600,18 @@ export default function PublicPage() {
               </div>
               :feedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
             }
+
+            {/* Recently Fixed */}
+            {fixedReports.length>0&&(
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:10,margin:"24px 0 12px"}}>
+                  <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
+                  <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#22C55E"}}>RECENTLY FIXED · {fixedReports.length}</div>
+                  <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
+                </div>
+                {fixedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -719,20 +723,6 @@ export default function PublicPage() {
         </div>
       )}
 
-      {/* ══ FIXED TAB ══ */}
-      {tab==="fixed"&&(
-        <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
-          <div style={{marginBottom:18}}>
-            <div style={{color:"#fff",fontWeight:900,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Roads Citizens Fixed</div>
-            <div style={{color:"#777",fontSize:13}}>These hazards were reported and resolved.</div>
-          </div>
-          {fixedReports.length===0
-            ?<div style={{textAlign:"center" as const,padding:"48px 0",color:"#555",fontSize:14}}>Nothing resolved yet</div>
-            :fixedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
-          }
-        </div>
-      )}
-
       {/* PWA install */}
       {showInstall&&(
         <div style={{position:"fixed" as const,bottom:76,left:12,right:12,zIndex:105,background:"#0D0D0D",border:"1px solid #1e1e1e",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease"}}>
@@ -786,27 +776,19 @@ export default function PublicPage() {
       )}
 
       {/* ── BOTTOM NAV ── */}
-      {/*
-        5 equal flex columns: Map | Feed | [center] | Fixed | ghost
-        Center col sits at 40–60% → mid = 50% → FAB left:50% is exact center.
-        Ghost col mirrors Map col → visually symmetric around the FAB.
-      */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"1px solid #111",backdropFilter:"blur(20px)"}}>
-        {/* FAB — true center: left 50% = mid of 5-col flex */}
-        <div style={{position:"absolute" as const,top:-26,left:"50%",transform:"translateX(-50%)"}}>
-          <button onClick={onReport} style={{width:54,height:54,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 20px rgba(239,68,68,0.6)"}}>
-            🚨
-          </button>
-        </div>
-        <div style={{display:"flex",paddingBottom:20}}>
-          <NavBtn tKey="map"   label="Map"/>
-          <NavBtn tKey="feed"  label="Feed"/>
-          {/* Center slot: FAB floats above, "Report" label anchors it */}
-          <div style={{flex:1,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2}}>
-            <span style={{fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444"}}>REPORT</span>
+        <div style={{display:"flex",alignItems:"flex-end",paddingBottom:20}}>
+          <NavBtn tKey="map"  label="Map"/>
+          {/* FAB — inline center, lifted above the bar */}
+          <div style={{flex:1,display:"flex",justifyContent:"center",alignItems:"flex-end"}}>
+            <div style={{position:"relative" as const,bottom:14}}>
+              <button onClick={onReport} style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 4px 24px rgba(239,68,68,0.65)"}}>
+                🚨
+              </button>
+              <div style={{textAlign:"center" as const,marginTop:4,fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444",lineHeight:1}}>REPORT</div>
+            </div>
           </div>
-          <NavBtn tKey="fixed" label="Fixed"/>
-          <div style={{flex:1}}/>{/* ghost — mirrors Map col */}
+          <NavBtn tKey="feed" label="Feed"/>
         </div>
       </div>
     </div>

@@ -113,7 +113,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       markersRef.current.push(marker);
     });
 
-    setMarkerCount(markerCount);
+    setMarkerCount(markersRef.current.length);
 
     // Fit bounds if we have multiple pins
     if (visible.length > 1) {
