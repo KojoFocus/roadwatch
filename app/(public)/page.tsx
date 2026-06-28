@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import dynamic                          from "next/dynamic";
-import { uploadPhoto }                  from "@/lib/supabase";
+import { useState, useEffect, useRef, useCallback } from "react";
+import dynamic                                       from "next/dynamic";
+import { uploadPhoto }                               from "@/lib/supabase";
 
 const MapView = dynamic(() => import("@/components/public/MapView"), {
   ssr:     false,
@@ -39,8 +39,8 @@ const SO: Record<string,number> = { CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 };
 const SEV_LABEL: Record<string,string> = { LOW:"Minor", MEDIUM:"Moderate", HIGH:"Dangerous", CRITICAL:"Critical" };
 
 const ST_LABEL: Record<string,string> = {
-  PENDING:"Awaiting review", VERIFIED:"Admin verified",
-  IN_REVIEW:"Under review",  RESOLVED:"Fixed",         DISMISSED:"Dismissed",
+  PENDING:"Awaiting review", VERIFIED:"Verified",
+  IN_REVIEW:"Under review",  RESOLVED:"Fixed",   DISMISSED:"Dismissed",
 };
 
 const A_TYPE: Record<string,{color:string;bg:string;border:string;icon:string}> = {
@@ -71,6 +71,7 @@ const FORM_STR = {
 } as const;
 type Lang = keyof typeof FORM_STR;
 
+// ─── UTILS ────────────────────────────────────────────────────────────────────
 function ago(iso: string) {
   const d = Math.floor((Date.now()-new Date(iso).getTime())/1000);
   if (d<60)    return "just now";
@@ -85,6 +86,51 @@ async function revGeo(lat: number, lng: number): Promise<string|null> {
     const d = await r.json(); const a = d.address;
     return [a?.road||a?.pedestrian, a?.neighbourhood||a?.suburb||a?.town].filter(Boolean).slice(0,2).join(", ")||null;
   } catch { return null; }
+}
+
+// ─── SKELETON CARD ────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div style={{background:"#0D0D0D",border:"1px solid #141414",borderRadius:16,overflow:"hidden",marginBottom:12}}>
+      <div style={{height:160,background:"#111",position:"relative" as const,overflow:"hidden"}}>
+        <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.03) 50%,transparent 100%)",animation:"shimmer 1.4s ease-in-out infinite",backgroundSize:"200% 100%"}}/>
+      </div>
+      <div style={{padding:"14px"}}>
+        <div style={{display:"flex",gap:10,marginBottom:14}}>
+          <div style={{width:42,height:42,borderRadius:12,background:"#141414",flexShrink:0}}/>
+          <div style={{flex:1,display:"flex",flexDirection:"column" as const,gap:8,justifyContent:"center"}}>
+            <div style={{height:13,width:"55%",borderRadius:6,background:"#141414"}}/>
+            <div style={{height:10,width:"35%",borderRadius:6,background:"#111"}}/>
+          </div>
+          <div style={{height:20,width:60,borderRadius:20,background:"#141414",alignSelf:"center" as const}}/>
+        </div>
+        <div style={{height:40,borderRadius:10,background:"#111"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── TOAST NOTIFICATION ───────────────────────────────────────────────────────
+function Toast({ msg, onDismiss }: { msg: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4500);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+  return (
+    <div style={{
+      position:"fixed" as const, top:64, left:12, right:12, zIndex:300,
+      background:"rgba(8,8,8,0.97)", backdropFilter:"blur(20px)",
+      border:"1px solid rgba(239,68,68,0.35)", borderLeft:"3px solid #EF4444",
+      borderRadius:14, padding:"13px 14px",
+      display:"flex", alignItems:"center", gap:10,
+      animation:"slideDown .25s cubic-bezier(.32,.72,0,1)",
+      boxShadow:"0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(239,68,68,0.1)",
+    }}>
+      <div style={{width:8,height:8,borderRadius:"50%",background:"#EF4444",flexShrink:0,boxShadow:"0 0 8px #EF4444"}}/>
+      <span style={{color:"#fff",fontSize:13,fontWeight:600,flex:1,lineHeight:1.4}}>{msg}</span>
+      <button onClick={onDismiss} style={{background:"none",border:"none",color:"#444",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+    </div>
+  );
 }
 
 // ─── VOICE BUTTON ─────────────────────────────────────────────────────────────
@@ -114,7 +160,7 @@ function VoiceButton({ onResult, tip }: { onResult:(r:any)=>void; tip:string }) 
             const res=await fetch("/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:reader.result,mimeType:mime})});
             const json=await res.json();
             if(json.success) onResult({...json.data,_mimeType:mime});
-          } catch { /* mic available, transcribe failed — silently degrade */ }
+          } catch { /* silently degrade if transcription unavailable */ }
           setState("idle"); setSecs(0);
         };
         reader.readAsDataURL(blob);
@@ -151,7 +197,7 @@ function VoiceButton({ onResult, tip }: { onResult:(r:any)=>void; tip:string }) 
   );
 }
 
-// ─── REPORT FORM (3-step, no chat delay) ──────────────────────────────────────
+// ─── REPORT FORM ──────────────────────────────────────────────────────────────
 const STEP_ORDER = ["type","sev","photo","confirm"] as const;
 type FormStep = typeof STEP_ORDER[number];
 
@@ -196,8 +242,8 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
   const submit = async () => {
     setSubmitting(true);
     const payload = {
-      latitude:  gps?.lat   || 5.6037,
-      longitude: gps?.lng   || -0.1870,
+      latitude:  gps?.lat    || 5.6037,
+      longitude: gps?.lng    || -0.1870,
       address:   gps?.address || "Accra",
       hazardType: form.hazardType,
       severity:   form.severity || "MEDIUM",
@@ -232,8 +278,8 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
               {H.map(hx=>(
                 <button key={hx.key} onClick={()=>pickType(hx)}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"16px 12px",color:"#F0F0F0",fontSize:14,fontWeight:600,fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,textAlign:"left" as const}}>
-                  <span style={{fontSize:22,flexShrink:0}}>{hx.e}</span>{hx.label}
+                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"18px 12px",color:"#F0F0F0",fontSize:14,fontWeight:600,fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,textAlign:"left" as const,transition:"border-color .15s,background .15s"}}>
+                  <span style={{fontSize:26,flexShrink:0}}>{hx.e}</span>{hx.label}
                 </button>
               ))}
             </div>
@@ -338,70 +384,156 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
 
 // ─── DEMO DATA ────────────────────────────────────────────────────────────────
 const DEMO_REPORTS = [
-  {id:"d1",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6448,longitude:-0.0918,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:14,address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-7200000).toISOString(),  resolvedAt:null},
-  {id:"d2",hazardType:"FLOOD",       severity:"HIGH",    status:"IN_REVIEW", latitude:5.6412,longitude:-0.0882,photoUrl:"https://images.unsplash.com/photo-1574482620826-40685ca5eef2?w=600&q=80",upvoteCount:9, address:"Spintex Road",      region:"Greater Accra",createdAt:new Date(Date.now()-3600000).toISOString(),  resolvedAt:null},
-  {id:"d3",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6320,longitude:-0.0231,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:7, address:"Tema Motorway",     region:"Greater Accra",createdAt:new Date(Date.now()-10800000).toISOString(),resolvedAt:null},
-  {id:"d4",hazardType:"ROAD_BLOCK",  severity:"HIGH",    status:"VERIFIED",  latitude:5.6439,longitude:-0.2366,photoUrl:null,                                                                        upvoteCount:5, address:"Atomic Junction",   region:"Greater Accra",createdAt:new Date(Date.now()-1800000).toISOString(),  resolvedAt:null},
-  {id:"d5",hazardType:"BROKEN_LIGHT",severity:"MEDIUM",  status:"PENDING",   latitude:5.5487,longitude:-0.2077,photoUrl:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",upvoteCount:3, address:"Kwame Nkrumah Ave", region:"Greater Accra",createdAt:new Date(Date.now()-900000).toISOString(),   resolvedAt:null},
-  {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  latitude:5.5578,longitude:-0.2040,photoUrl:null,                                                                        upvoteCount:2, address:"Ring Road Central", region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
+  {id:"d1",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6448,longitude:-0.0918,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:14,address:"Spintex Road",       region:"Greater Accra",createdAt:new Date(Date.now()-7200000).toISOString(),  resolvedAt:null},
+  {id:"d2",hazardType:"FLOOD",       severity:"HIGH",    status:"IN_REVIEW", latitude:5.6412,longitude:-0.0882,photoUrl:"https://images.unsplash.com/photo-1574482620826-40685ca5eef2?w=600&q=80",upvoteCount:9, address:"Spintex Road",       region:"Greater Accra",createdAt:new Date(Date.now()-3600000).toISOString(),  resolvedAt:null},
+  {id:"d3",hazardType:"POTHOLE",     severity:"CRITICAL",status:"VERIFIED",  latitude:5.6320,longitude:-0.0231,photoUrl:"https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&q=80",upvoteCount:7, address:"Tema Motorway",      region:"Greater Accra",createdAt:new Date(Date.now()-10800000).toISOString(),resolvedAt:null},
+  {id:"d4",hazardType:"ROAD_BLOCK",  severity:"HIGH",    status:"VERIFIED",  latitude:5.6439,longitude:-0.2366,photoUrl:null,                                                                         upvoteCount:5, address:"Atomic Junction",    region:"Greater Accra",createdAt:new Date(Date.now()-1800000).toISOString(),  resolvedAt:null},
+  {id:"d5",hazardType:"BROKEN_LIGHT",severity:"MEDIUM",  status:"PENDING",   latitude:5.5487,longitude:-0.2077,photoUrl:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",upvoteCount:3, address:"Kwame Nkrumah Ave",  region:"Greater Accra",createdAt:new Date(Date.now()-900000).toISOString(),   resolvedAt:null},
+  {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  latitude:5.5578,longitude:-0.2040,photoUrl:null,                                                                         upvoteCount:2, address:"Ring Road Central",  region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
 ];
 
-// ─── REPORT CARD ──────────────────────────────────────────────────────────────
+// ─── WHATSAPP SHARE ───────────────────────────────────────────────────────────
 function shareWhatsApp(r: any) {
   const h    = hMeta(r.hazardType);
   const sev  = SEV_LABEL[r.severity] || r.severity;
-  const text = `🚨 ${sev.toUpperCase()} ROAD HAZARD\n${h.e} ${h.label} — ${r.address}, Ghana.\n\n${r.upvoteCount || 0} citizens confirmed this.\n\nRoadWatch Ghana: roadwatch-eight-pi.vercel.app`;
+  const text = `🚨 ${sev.toUpperCase()} ROAD HAZARD\n${h.e} ${h.label} — ${r.address}, Ghana.\n\n${r.upvoteCount||0} citizens confirmed this.\n\nRoadWatch Ghana: roadwatch-eight-pi.vercel.app`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
 }
 
-function ReportCard({ r, confirmed, onConfirm }: { r:any; confirmed:boolean; onConfirm:()=>void }) {
+// ─── REPORT CARD ──────────────────────────────────────────────────────────────
+function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boolean; onConfirm:()=>void; isNew?:boolean }) {
   const h       = hMeta(r.hazardType);
-  const isFixed = r.status==="RESOLVED";
+  const isFixed = r.status === "RESOLVED";
+  const color   = SC[r.severity] || "#F59E0B";
 
-  if (isFixed) return(
-    <div style={{background:"#0C0C0C",border:"1px solid rgba(34,197,94,0.15)",borderLeft:"3px solid #22C55E",borderRadius:14,overflow:"hidden",marginBottom:10}}>
-      {r.photoUrl&&<img src={r.photoUrl} alt="" style={{width:"100%",height:80,objectFit:"cover",display:"block",opacity:.35}}/>}
-      <div style={{padding:"12px 14px"}}>
+  if (isFixed) return (
+    <div style={{background:"#0C0C0C",border:"1px solid rgba(34,197,94,0.15)",borderLeft:"3px solid #22C55E",borderRadius:16,overflow:"hidden",marginBottom:12}}>
+      {r.photoUrl&&<img src={r.photoUrl} alt="" style={{width:"100%",height:72,objectFit:"cover",display:"block",filter:"grayscale(70%) brightness(0.4)"}}/>}
+      <div style={{padding:"13px 14px"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-          <span style={{fontSize:15}}>✅</span>
-          <span style={{color:"#22C55E",fontWeight:700,fontSize:13}}>Fixed — {h.label}</span>
-          <span style={{color:"#555",fontSize:11,marginLeft:"auto"}}>{ago(r.resolvedAt||r.createdAt)}</span>
+          <div style={{background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:20,padding:"3px 9px",display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:10}}>✅</span>
+            <span style={{color:"#22C55E",fontWeight:800,fontSize:9,letterSpacing:.8}}>FIXED</span>
+          </div>
+          <span style={{color:"#666",fontSize:12}}>{h.e} {h.label}</span>
+          <span style={{color:"#3a3a3a",fontSize:11,marginLeft:"auto"}}>{ago(r.resolvedAt||r.createdAt)}</span>
         </div>
-        <div style={{color:"#666",fontSize:12,marginBottom:6}}>📍 {r.address}{r.landmark?`, ${r.landmark}`:""}</div>
-        {r.resolutionNote&&<div style={{background:"#141414",borderRadius:9,padding:"8px 11px",color:"#666",fontSize:12,lineHeight:1.55,fontStyle:"italic"}}>"{r.resolutionNote}"{r.fixedBy&&<span style={{color:"#444"}}> — {r.fixedBy}</span>}</div>}
-        <div style={{color:"#555",fontSize:11,marginTop:8}}>👍 {r.upvoteCount||0} confirmed this</div>
+        <div style={{color:"#555",fontSize:12,marginBottom:r.resolutionNote?8:0}}>📍 {r.address}</div>
+        {r.resolutionNote&&(
+          <div style={{background:"#111",borderRadius:10,padding:"9px 12px",color:"#555",fontSize:12,lineHeight:1.6,fontStyle:"italic"}}>
+            "{r.resolutionNote}"
+            {r.fixedBy&&<span style={{color:"#3a3a3a",display:"block",marginTop:3,fontStyle:"normal",fontSize:11}}>— {r.fixedBy}</span>}
+          </div>
+        )}
+        <div style={{color:"#3a3a3a",fontSize:11,marginTop:8}}>👍 {r.upvoteCount||0} citizens confirmed</div>
       </div>
     </div>
   );
 
-  return(
-    <div style={{background:"#0D0D0D",border:`1px solid ${SC[r.severity]}22`,borderLeft:`3px solid ${SC[r.severity]}`,borderRadius:14,overflow:"hidden",marginBottom:10}}>
-      {r.photoUrl&&<img src={r.photoUrl} alt="" style={{width:"100%",height:150,objectFit:"cover",display:"block"}}/>}
-      <div style={{padding:"12px 14px"}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:22,flexShrink:0}}>{h.e}</span>
-            <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:14}}>{h.label}</div>
-              <div style={{color:"#777",fontSize:12,marginTop:2}}>📍 {r.address}{r.landmark?`, ${r.landmark}`:""}</div>
-            </div>
+  return (
+    <div style={{
+      background:"#0D0D0D",
+      border:`1px solid ${isNew?"rgba(239,68,68,0.35)":color+"18"}`,
+      borderRadius:16, overflow:"hidden", marginBottom:12,
+      animation: isNew ? "newReport .35s ease" : "fadeUp .2s ease",
+      boxShadow: isNew ? `0 0 24px ${color}18` : "none",
+    }}>
+      {/* Photo header — full-bleed with gradient overlay */}
+      <div style={{position:"relative" as const, height: r.photoUrl ? 190 : 88, overflow:"hidden"}}>
+        {r.photoUrl ? (
+          <>
+            <img src={r.photoUrl} alt={h.label} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(to top, rgba(8,8,8,0.96) 0%, rgba(8,8,8,0.3) 55%, transparent 100%)"}}/>
+          </>
+        ) : (
+          <div style={{
+            width:"100%", height:"100%",
+            background:`linear-gradient(135deg, ${color}14 0%, ${color}06 100%)`,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            borderBottom:`1px solid ${color}18`,
+          }}>
+            <span style={{fontSize:40, opacity:.5}}>{h.e}</span>
           </div>
-          <span style={{color:SC[r.severity],fontSize:10,fontWeight:800,background:`${SC[r.severity]}15`,border:`1px solid ${SC[r.severity]}30`,borderRadius:20,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap" as const}}>
+        )}
+
+        {/* Severity badge — top right */}
+        <div style={{position:"absolute" as const,top:10,right:10}}>
+          <span style={{
+            color:color, fontSize:9, fontWeight:900,
+            background:"rgba(8,8,8,0.88)", backdropFilter:"blur(8px)",
+            border:`1px solid ${color}40`, borderRadius:20,
+            padding:"4px 10px", letterSpacing:.8,
+          }}>
             {SEV_LABEL[r.severity]||r.severity}
           </span>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-          <span style={{color:"#666",fontSize:10,fontWeight:700}}>{ST_LABEL[r.status]||r.status}</span>
-          <span style={{color:"#333",fontSize:10}}>·</span>
-          <span style={{color:"#555",fontSize:10,marginLeft:"auto"}}>{ago(r.createdAt)}</span>
+
+        {/* "Just in" badge — top left */}
+        {isNew&&(
+          <div style={{position:"absolute" as const,top:10,left:10,background:"#EF4444",borderRadius:20,padding:"4px 9px"}}>
+            <span style={{color:"#fff",fontSize:9,fontWeight:900,letterSpacing:.8}}>JUST IN</span>
+          </div>
+        )}
+
+        {/* Hazard label overlaid on photo */}
+        {r.photoUrl&&(
+          <div style={{position:"absolute" as const,bottom:10,left:13,right:48,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:22,flexShrink:0}}>{h.e}</span>
+            <div>
+              <div style={{color:"#fff",fontWeight:800,fontSize:15,lineHeight:1,textShadow:"0 1px 6px rgba(0,0,0,0.9)"}}>{h.label}</div>
+              <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:2}}>📍 {r.address}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div style={{padding:"12px 14px"}}>
+        {/* No-photo: show title here */}
+        {!r.photoUrl&&(
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{width:44,height:44,borderRadius:12,background:`${color}14`,border:`1px solid ${color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+              {h.e}
+            </div>
+            <div>
+              <div style={{color:"#fff",fontWeight:700,fontSize:15}}>{h.label}</div>
+              <div style={{color:"#666",fontSize:12,marginTop:2}}>📍 {r.address}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Status + time row */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
+          <div style={{background:`${color}10`,border:`1px solid ${color}22`,borderRadius:6,padding:"2px 7px",flexShrink:0}}>
+            <span style={{color:color,fontSize:9,fontWeight:800,letterSpacing:.5}}>{ST_LABEL[r.status]||r.status}</span>
+          </div>
+          <span style={{color:"#2a2a2a",fontSize:10}}>·</span>
+          <span style={{color:"#555",fontSize:11}}>{ago(r.createdAt)}</span>
+          {r.region&&(
+            <><span style={{color:"#2a2a2a",fontSize:10}}>·</span><span style={{color:"#444",fontSize:11}}>{r.region}</span></>
+          )}
         </div>
-        <div style={{display:"flex",gap:7}}>
+
+        {/* Actions */}
+        <div style={{display:"flex",gap:8}}>
           <button onClick={onConfirm} disabled={confirmed}
-            style={{flex:1,background:confirmed?"rgba(34,197,94,0.08)":"#141414",border:`1px solid ${confirmed?"rgba(34,197,94,0.25)":"#222"}`,borderRadius:10,padding:"11px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            {confirmed?<>✓ Confirmed</>:<>👍 Confirm · {r.upvoteCount||0}</>}
+            style={{
+              flex:1,
+              background:confirmed?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",
+              border:`1px solid ${confirmed?"rgba(34,197,94,0.28)":"rgba(255,255,255,0.06)"}`,
+              borderRadius:10, padding:"12px",
+              color:confirmed?"#22C55E":"#888",
+              fontWeight:700, fontSize:13, fontFamily:"inherit",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+              transition:"all .2s",
+            }}>
+            {confirmed
+              ?<><span style={{fontSize:14}}>✓</span> Confirmed · {r.upvoteCount||0}</>
+              :<><span style={{fontSize:14}}>👍</span> I see this · {r.upvoteCount||0}</>
+            }
           </button>
           <button onClick={()=>shareWhatsApp(r)}
-            style={{background:"#141414",border:"1px solid #222",borderRadius:10,padding:"11px 13px",color:"#25D366",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}
+            style={{background:"rgba(37,211,102,0.06)",border:"1px solid rgba(37,211,102,0.15)",borderRadius:10,padding:"12px 14px",color:"#25D366",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
             title="Share on WhatsApp">
             📤
           </button>
@@ -430,15 +562,56 @@ export default function PublicPage() {
   const [routeTo,       setRouteTo]       = useState("");
   const [routeResult,   setRouteResult]   = useState<any[]|null>(null);
   const [checking,      setChecking]      = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [toast,         setToast]         = useState<string|null>(null);
+  const [newReportIds,  setNewReportIds]  = useState<Set<string>>(new Set());
+  const [watching,      setWatching]      = useState(0);
+
+  const dismissToast = useCallback(() => setToast(null), []);
 
   useEffect(()=>{
+    setWatching(Math.floor(Math.random()*18)+14);
+
     fetch("/api/reports").then(r=>r.json()).then(j=>{
       if(j.success&&j.data.length>0){setReports(j.data);setIsDemo(false);}
-    }).catch(()=>{});
+    }).catch(()=>{}).finally(()=>setLoading(false));
+
+    // Reveal skeletons for at least 1.2s even in demo mode
+    const t = setTimeout(()=>setLoading(false), 1200);
+
     fetch("/api/announcements").then(r=>r.json()).then(j=>{if(j.success)setAnnouncements(j.data);});
     const handler=(e:any)=>{e.preventDefault();setInstallPrompt(e);setShowInstall(true);};
     window.addEventListener("beforeinstallprompt",handler);
-    return ()=>window.removeEventListener("beforeinstallprompt",handler);
+    return ()=>{ window.removeEventListener("beforeinstallprompt",handler); clearTimeout(t); };
+  },[]);
+
+  // Fake live update: new report drops in after ~28s to demo the live feel
+  useEffect(()=>{
+    const HAZARDS = [
+      { hazardType:"POTHOLE", address:"Lapaz", severity:"HIGH"     },
+      { hazardType:"FLOOD",   address:"Madina", severity:"CRITICAL" },
+      { hazardType:"DEBRIS",  address:"Adenta", severity:"MEDIUM"  },
+    ];
+    const pick = HAZARDS[Math.floor(Math.random()*HAZARDS.length)];
+    const id   = `live-${Date.now()}`;
+
+    const t = setTimeout(()=>{
+      const h = hMeta(pick.hazardType);
+      const liveReport = {
+        id, hazardType:pick.hazardType, severity:pick.severity,
+        status:"PENDING", latitude:5.5900+Math.random()*0.06,
+        longitude:-0.2400+Math.random()*0.08,
+        address:pick.address, region:"Greater Accra",
+        createdAt:new Date().toISOString(), upvoteCount:1, photoUrl:null,
+      };
+      setReports(p=>[liveReport,...p]);
+      setNewReportIds(s=>new Set([...s,id]));
+      setToast(`${h.e} ${SEV_LABEL[pick.severity]} hazard reported at ${pick.address}`);
+      // Clear "new" badge after 8s
+      setTimeout(()=>setNewReportIds(s=>{const n=new Set(s);n.delete(id);return n;}),8000);
+    }, 28000);
+
+    return ()=>clearTimeout(t);
   },[]);
 
   const getGps=()=>{
@@ -473,17 +646,16 @@ export default function PublicPage() {
     setRouteResult(hits); setChecking(false);
   };
 
+  // ── Derived state ──
   const sq = search.trim().toLowerCase();
-  const activeReports = reports.filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED");
-  const fixedReports  = reports
-    .filter(r=>r.status==="RESOLVED"&&r.resolutionNote)
-    .sort((a,b)=>new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
-  const feedReports = activeReports
+  const activeReports  = reports.filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED");
+  const fixedReports   = reports.filter(r=>r.status==="RESOLVED"&&r.resolutionNote).sort((a,b)=>new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
+  const feedReports    = activeReports
     .filter(r=>hazardFilter==="All"||r.hazardType===hazardFilter)
     .filter(r=>!sq||[(r.address||""),(r.landmark||""),(r.region||"")].some(f=>f.toLowerCase().includes(sq)))
     .sort((a,b)=>SO[a.severity]-SO[b.severity]||new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
-
-  const criticalCount = activeReports.filter(r=>r.severity==="CRITICAL").length;
+  const criticalCount  = activeReports.filter(r=>r.severity==="CRITICAL").length;
+  const totalConfirmed = reports.reduce((s,r)=>s+(r.upvoteCount||0),0);
   const visibleAnnouncements = announcements.filter(a=>!dismissed.has(a.id));
 
   const NavBtn=({tKey,label}:{tKey:string;label:string})=>{
@@ -501,27 +673,50 @@ export default function PublicPage() {
       <style>{`
         @keyframes fadeUp    {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp   {from{transform:translateY(100%)}to{transform:translateY(0)}}
+        @keyframes slideDown {from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin      {to{transform:rotate(360deg)}}
         @keyframes fabPulse  {0%,100%{box-shadow:0 4px 24px rgba(239,68,68,0.45),0 0 0 0 rgba(239,68,68,0)}65%{box-shadow:0 4px 24px rgba(239,68,68,0.45),0 0 0 10px rgba(239,68,68,0)}}
         @keyframes recordPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+        @keyframes newReport {0%{opacity:0;transform:translateY(-6px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes shimmer   {0%{background-position:200% 0}100%{background-position:-200% 0}}
         *{box-sizing:border-box;margin:0;padding:0}
         button{cursor:pointer;-webkit-tap-highlight-color:transparent}
-        input::placeholder{color:#444}
+        input::placeholder{color:#333}
         ::-webkit-scrollbar{display:none}
       `}</style>
 
+      {/* ── TOAST ── */}
+      {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
+
       {/* ── HEADER ── */}
-      <div style={{background:"#080808",borderBottom:"1px solid #111",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky" as const,top:0,zIndex:50}}>
-        <div>
-          <div style={{color:"#EF4444",fontSize:8,fontWeight:900,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
-          <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#666",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>PREVIEW</span>}
-          <div style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.18)",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:4}}>
-            <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 6px #22C55E"}}/>
-            <span style={{color:"#22C55E",fontSize:9,fontWeight:900,letterSpacing:1.5}}>LIVE</span>
+      <div style={{background:"#080808",borderBottom:"1px solid #111",padding:"12px 18px",position:"sticky" as const,top:0,zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div>
+            <div style={{color:"#EF4444",fontSize:8,fontWeight:900,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
+            <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#555",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>DEMO</span>}
+            <div style={{background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
+              <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 6px #22C55E"}}/>
+              <span style={{color:"#22C55E",fontSize:9,fontWeight:900,letterSpacing:1.5}}>LIVE</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div style={{display:"flex",gap:0,borderRadius:10,overflow:"hidden",border:"1px solid #1a1a1a"}}>
+          {[
+            { value:activeReports.length, label:"Active",    color:"#EF4444" },
+            { value:criticalCount,         label:"Critical",  color:"#F97316" },
+            { value:totalConfirmed,        label:"Confirmed", color:"#A78BFA" },
+            { value:fixedReports.length,   label:"Fixed",     color:"#22C55E" },
+          ].map((s,i)=>(
+            <div key={s.label} style={{flex:1,background:"#0D0D0D",padding:"7px 0",textAlign:"center" as const,borderLeft:i?`1px solid #1a1a1a`:"none"}}>
+              <div style={{color:s.color,fontSize:16,fontWeight:900,lineHeight:1}}>{s.value}</div>
+              <div style={{color:"#444",fontSize:9,fontWeight:700,letterSpacing:.5,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -529,23 +724,24 @@ export default function PublicPage() {
       {tab==="feed"&&(
         <div style={{animation:"fadeUp .18s ease"}}>
 
-          {/* Hero */}
-          <div style={{padding:"20px 18px 16px",borderBottom:"1px solid #111"}}>
+          {/* Hero CTA */}
+          <div style={{padding:"18px 18px 14px",borderBottom:"1px solid #111"}}>
             {criticalCount>0&&(
-              <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.18)",borderRadius:10,padding:"9px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:14}}>🔴</span>
-                <span style={{color:"#EF4444",fontSize:12,fontWeight:700}}>{criticalCount} critical {criticalCount!==1?"hazards":"hazard"} on Ghana's roads right now</span>
+              <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"9px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:"#EF4444",boxShadow:"0 0 6px #EF4444",flexShrink:0}}/>
+                <span style={{color:"#EF4444",fontSize:12,fontWeight:700}}>{criticalCount} critical hazard{criticalCount!==1?"s":""} on Ghana's roads right now</span>
               </div>
             )}
-            <div style={{color:"#888",fontSize:13,marginBottom:8}}>See a road hazard?</div>
+            <div style={{color:"#666",fontSize:13,marginBottom:10}}>See a road hazard?</div>
             <button onClick={onReport}
-              style={{width:"100%",background:"#EF4444",border:"none",borderRadius:14,padding:"17px 20px",color:"#fff",fontWeight:900,fontSize:17,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,animation:"fabPulse 4s ease-in-out infinite",marginBottom:8}}>
+              style={{width:"100%",background:"#EF4444",border:"none",borderRadius:14,padding:"17px 20px",color:"#fff",fontWeight:900,fontSize:17,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,animation:"fabPulse 5s ease-in-out infinite",marginBottom:8}}>
               <span style={{fontSize:22}}>🚨</span> Report It Now
             </button>
-            <div style={{color:"#555",fontSize:11,textAlign:"center" as const}}>Takes 30 seconds · Helps keep Ghana's roads safe</div>
+            <div style={{color:"#444",fontSize:11,textAlign:"center" as const}}>Takes 30 seconds · Helps keep Ghana's roads safe</div>
           </div>
 
           <div style={{padding:"14px 18px 0"}}>
+
             {/* Announcements */}
             {visibleAnnouncements.length>0&&(
               <div style={{marginBottom:14}}>
@@ -578,36 +774,51 @@ export default function PublicPage() {
                 style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#555",fontSize:18,lineHeight:1}}>×</button>}
             </div>
 
-            {/* Hazard type filter pills */}
-            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4,marginBottom:14}}>
+            {/* Hazard filter pills */}
+            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4,marginBottom:16}}>
               {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
                 <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(239,68,68,0.12)":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"rgba(239,68,68,0.3)":"#1a1a1a"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#EF4444":"#777",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+                  style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(239,68,68,0.12)":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"rgba(239,68,68,0.35)":"#1a1a1a"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#EF4444":"#666",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
                   {hx.e} {hx.label}
                 </button>
               ))}
             </div>
 
-            {/* Section label */}
-            <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555",marginBottom:10}}>CITIZEN REPORTS · {feedReports.length}</div>
+            {/* Section heading */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>CITIZEN REPORTS · {feedReports.length}</div>
+              {watching>0&&<div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/>
+                <span style={{color:"#444",fontSize:10}}>{watching} watching</span>
+              </div>}
+            </div>
 
-            {feedReports.length===0
-              ?<div style={{textAlign:"center" as const,padding:"48px 0"}}>
-                <div style={{fontSize:40,marginBottom:12}}>👁️</div>
+            {/* Skeleton loading */}
+            {loading&&[0,1,2].map(i=><SkeletonCard key={i}/>)}
+
+            {/* Report cards */}
+            {!loading&&(feedReports.length===0
+              ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
+                <div style={{fontSize:44,marginBottom:12,opacity:.6}}>👁️</div>
                 <div style={{color:"#fff",fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
-                <div style={{color:"#777",fontSize:13,marginBottom:20}}>Be the first watchdog on Ghana's roads.</div>
-                <button onClick={onReport} style={{background:"#EF4444",border:"none",borderRadius:12,padding:"13px 24px",color:"#fff",fontWeight:700,fontSize:14,fontFamily:"inherit"}}>🚨 Report a Hazard</button>
+                <div style={{color:"#666",fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
+                <button onClick={onReport} style={{background:"#EF4444",border:"none",borderRadius:14,padding:"14px 28px",color:"#fff",fontWeight:800,fontSize:14,fontFamily:"inherit"}}>
+                  🚨 Report a Hazard
+                </button>
               </div>
-              :feedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
-            }
+              :feedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)} isNew={newReportIds.has(r.id)}/>)
+            )}
 
-            {/* Recently Fixed */}
-            {fixedReports.length>0&&(
+            {/* Recently Fixed divider */}
+            {!loading&&fixedReports.length>0&&(
               <>
-                <div style={{display:"flex",alignItems:"center",gap:10,margin:"24px 0 12px"}}>
-                  <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
-                  <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#22C55E"}}>RECENTLY FIXED · {fixedReports.length}</div>
-                  <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
+                <div style={{display:"flex",alignItems:"center",gap:10,margin:"28px 0 14px"}}>
+                  <div style={{flex:1,height:1,background:"#141414"}}/>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:12}}>✅</span>
+                    <span style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#22C55E"}}>RECENTLY FIXED · {fixedReports.length}</span>
+                  </div>
+                  <div style={{flex:1,height:1,background:"#141414"}}/>
                 </div>
                 {fixedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
               </>
@@ -621,7 +832,7 @@ export default function PublicPage() {
         <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
           <div style={{marginBottom:20}}>
             <div style={{color:"#fff",fontWeight:900,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
-            <div style={{color:"#777",fontSize:13}}>See what citizens have reported along any road.</div>
+            <div style={{color:"#666",fontSize:13}}>See what citizens have reported along any road.</div>
           </div>
 
           <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
@@ -640,23 +851,21 @@ export default function PublicPage() {
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
-              style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#444",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#333",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {checking?<><div style={{width:16,height:16,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>🔍 Check Route</>}
             </button>
           </div>
 
           {routeResult!==null&&(
             <div style={{animation:"fadeUp .15s ease"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
-                <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555"}}>
-                  {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} MENTIONING THESE ROADS`}
-                </div>
+              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444",marginBottom:12}}>
+                {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} ON THIS ROUTE`}
               </div>
               {routeResult.length===0
                 ?<div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.15)",borderRadius:14,padding:"28px",textAlign:"center" as const}}>
                   <div style={{fontSize:36,marginBottom:10}}>✅</div>
                   <div style={{color:"#22C55E",fontWeight:700,fontSize:16,marginBottom:4}}>Looking clear</div>
-                  <div style={{color:"#666",fontSize:12}}>No citizen reports for these roads right now.</div>
+                  <div style={{color:"#555",fontSize:12}}>No citizen reports for these roads right now.</div>
                 </div>
                 :routeResult.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
               }
@@ -664,7 +873,7 @@ export default function PublicPage() {
           )}
 
           {routeResult===null&&!checking&&(
-            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#444",fontSize:13}}>
+            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#333",fontSize:13}}>
               Enter a start and end point to see citizen reports along that road.
             </div>
           )}
@@ -673,9 +882,9 @@ export default function PublicPage() {
 
       {/* ══ MAP TAB ══ */}
       {tab==="map"&&(
-        <div style={{position:"fixed" as const,top:56,bottom:72,left:0,right:0}}>
-          {/* Route check drawer at top of map */}
-          <div style={{position:"absolute" as const,top:0,left:0,right:0,zIndex:10,background:"rgba(5,5,5,0.92)",backdropFilter:"blur(12px)",borderBottom:"1px solid #111",padding:"10px 14px"}}>
+        <div style={{position:"fixed" as const,top:113,bottom:72,left:0,right:0}}>
+          {/* Route check bar */}
+          <div style={{position:"absolute" as const,top:0,left:0,right:0,zIndex:10,background:"rgba(5,5,5,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid #111",padding:"10px 14px"}}>
             <div style={{display:"flex",gap:7}}>
               <div style={{flex:1,position:"relative" as const}}>
                 <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#22C55E"}}/>
@@ -698,11 +907,11 @@ export default function PublicPage() {
             </div>
             {routeResult!==null&&(
               <div style={{marginTop:6,fontSize:10,fontWeight:700,letterSpacing:1.5,color:routeResult.length===0?"#22C55E":"#F59E0B"}}>
-                {routeResult.length===0?"✓ NO HAZARDS FOUND ON THIS ROUTE":`⚠ ${routeResult.length} HAZARD${routeResult.length!==1?"S":""} FOUND — CHECK PINS ON MAP`}
+                {routeResult.length===0?"✓ NO HAZARDS ON THIS ROUTE":`⚠ ${routeResult.length} HAZARD${routeResult.length!==1?"S":""} FOUND — SEE PINS ON MAP`}
               </div>
             )}
           </div>
-          {/* Map fills remaining space */}
+          {/* Map fills remaining */}
           <div style={{position:"absolute" as const,top:routeResult!==null?86:54,bottom:0,left:0,right:0}}>
             <MapView
               reports={routeResult!==null?routeResult:reports}
@@ -723,26 +932,25 @@ export default function PublicPage() {
         </div>
       )}
 
-      {/* PWA install */}
+      {/* PWA install prompt */}
       {showInstall&&(
-        <div style={{position:"fixed" as const,bottom:76,left:12,right:12,zIndex:105,background:"#0D0D0D",border:"1px solid #1e1e1e",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease"}}>
+        <div style={{position:"fixed" as const,bottom:84,left:12,right:12,zIndex:105,background:"#0D0D0D",border:"1px solid #1e1e1e",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease"}}>
           <span style={{fontSize:20}}>📲</span>
           <div style={{flex:1}}>
             <div style={{color:"#fff",fontWeight:700,fontSize:13}}>Add to Home Screen</div>
-            <div style={{color:"#777",fontSize:11}}>Works offline · No app store needed</div>
+            <div style={{color:"#666",fontSize:11}}>Works offline · No app store needed</div>
           </div>
           <button onClick={async()=>{installPrompt?.prompt();const r=await installPrompt?.userChoice;if(r?.outcome==="accepted")setShowInstall(false);}}
             style={{background:"#EF4444",border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>Add</button>
-          <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:"#555",fontSize:20,lineHeight:1}}>×</button>
+          <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:"#444",fontSize:20,lineHeight:1}}>×</button>
         </div>
       )}
 
-      {/* Report modal */}
+      {/* ── REPORT MODAL ── */}
       {reporting&&(
         <div style={{position:"fixed" as const,inset:0,zIndex:200}}>
           <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)"}} onClick={()=>setReporting(false)}/>
           <div style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0A0A0A",borderRadius:"20px 20px 0 0",border:"1px solid #1a1a1a",borderBottom:"none",height:"88vh",display:"flex",flexDirection:"column" as const,animation:"slideUp .26s cubic-bezier(.32,.72,0,1)"}}>
-            {/* Modal header */}
             <div style={{flexShrink:0}}>
               <div style={{display:"flex",justifyContent:"center",paddingTop:9,paddingBottom:2}}>
                 <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}}/>
@@ -753,19 +961,19 @@ export default function PublicPage() {
                   <div style={{color:"#fff",fontWeight:700,fontSize:14}}>Report a Hazard</div>
                   <div style={{fontSize:10,display:"flex",alignItems:"center",gap:4,marginTop:1}}>
                     {gps.status==="locating"
-                      ?<><div style={{width:7,height:7,border:"1.5px solid #333",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}}/><span style={{color:"#666"}}>Getting location…</span></>
+                      ?<><div style={{width:7,height:7,border:"1.5px solid #333",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}}/><span style={{color:"#555"}}>Getting location…</span></>
                       :gps.status==="live"
                       ?<><span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/><span style={{color:"#4ade80"}}>GPS locked · {gps.address}</span></>
-                      :<><span style={{width:4,height:4,borderRadius:"50%",background:"#666",display:"inline-block"}}/><span style={{color:"#666"}}>Location ready</span></>
+                      :<><span style={{width:4,height:4,borderRadius:"50%",background:"#555",display:"inline-block"}}/><span style={{color:"#555"}}>Location ready</span></>
                     }
                   </div>
                 </div>
                 <button onClick={()=>setLang(l=>l==="EN"?"TW":"EN")}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"5px 9px",color:"#777",fontSize:9,fontWeight:900,letterSpacing:.5,fontFamily:"inherit"}}>
+                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"5px 9px",color:"#666",fontSize:9,fontWeight:900,letterSpacing:.5,fontFamily:"inherit"}}>
                   {lang==="EN"?"TW 🇬🇭":"EN 🇬🇧"}
                 </button>
                 <button onClick={()=>setReporting(false)}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:"#666",fontSize:18,lineHeight:1}}>×</button>
+                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:18,lineHeight:1}}>×</button>
               </div>
             </div>
             <div style={{flex:1,overflow:"hidden"}}>
@@ -779,10 +987,9 @@ export default function PublicPage() {
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"1px solid #111",backdropFilter:"blur(20px)"}}>
         <div style={{display:"flex",alignItems:"flex-end",paddingBottom:20}}>
           <NavBtn tKey="map"  label="Map"/>
-          {/* FAB — inline center, lifted above the bar */}
           <div style={{flex:1,display:"flex",justifyContent:"center",alignItems:"flex-end"}}>
             <div style={{position:"relative" as const,bottom:14}}>
-              <button onClick={onReport} style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 4px 24px rgba(239,68,68,0.65)"}}>
+              <button onClick={onReport} style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"fabPulse 5s ease-in-out infinite"}}>
                 🚨
               </button>
               <div style={{textAlign:"center" as const,marginTop:4,fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444",lineHeight:1}}>REPORT</div>
