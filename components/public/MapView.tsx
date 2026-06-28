@@ -6,9 +6,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 const SC: Record<string, string> = {
   CRITICAL: "#EF4444",
-  HIGH:     "#cccccc",
-  MEDIUM:   "#888888",
-  LOW:      "#555555",
+  HIGH:     "#1a1a1a",
+  MEDIUM:   "#555555",
+  LOW:      "#999999",
 };
 
 const EMOJI: Record<string, string> = {
@@ -54,7 +54,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
-      style:              "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      style:              "https://tiles.openfreemap.org/styles/positron",
       center:             [-0.187, 5.604],
       zoom:               11,
       attributionControl: false,
@@ -125,9 +125,9 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         paint:  {
           "circle-color":         "#1a1a1a",
           "circle-radius":        ["step", ["get", "point_count"], 18, 5, 24, 15, 30],
-          "circle-stroke-width":  1.5,
-          "circle-stroke-color":  "rgba(255,255,255,0.2)",
-          "circle-opacity":       0.95,
+          "circle-stroke-width":  2,
+          "circle-stroke-color":  "rgba(255,255,255,0.8)",
+          "circle-opacity":       0.9,
         },
       });
 
@@ -141,7 +141,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
           "text-field": "{point_count_abbreviated}",
           "text-size":  12,
         },
-        paint: { "text-color": "#aaa" },
+        paint: { "text-color": "#fff" },
       });
 
       // Individual points — red for critical, grey scale for rest
@@ -154,14 +154,14 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
           "circle-color": [
             "match", ["get", "severity"],
             "CRITICAL", "#EF4444",
-            "HIGH",     "#cccccc",
-            "MEDIUM",   "#888888",
-            "LOW",      "#555555",
-            "#888888",
+            "HIGH",     "#1a1a1a",
+            "MEDIUM",   "#555555",
+            "LOW",      "#999999",
+            "#555555",
           ],
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 6, 14, 11],
           "circle-stroke-width": 2,
-          "circle-stroke-color": "rgba(0,0,0,0.5)",
+          "circle-stroke-color": "rgba(255,255,255,0.6)",
           "circle-opacity": 0.95,
         },
       });
@@ -285,9 +285,9 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
           <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, color:"#444", marginBottom:10 }}>SEVERITY</div>
           {[
             { label:"Critical",  color:"#EF4444" },
-            { label:"Dangerous", color:"#cccccc" },
-            { label:"Moderate",  color:"#888888" },
-            { label:"Minor",     color:"#555555" },
+            { label:"Dangerous", color:"#1a1a1a" },
+            { label:"Moderate",  color:"#555555" },
+            { label:"Minor",     color:"#999999" },
           ].map(({ label, color }) => (
             <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
               <div style={{ width:11, height:11, borderRadius:"50%", background:color, flexShrink:0, boxShadow:`0 0 6px ${color}66` }}/>
