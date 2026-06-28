@@ -486,13 +486,15 @@ export default function PublicPage() {
   const criticalCount = activeReports.filter(r=>r.severity==="CRITICAL").length;
   const visibleAnnouncements = announcements.filter(a=>!dismissed.has(a.id));
 
-  // Nav helper
-  const NavBtn=({tKey,icon,label}:{tKey:string;icon:string;label:string})=>(
-    <button onClick={()=>setTab(tKey)} style={{background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",gap:3,fontFamily:"inherit",padding:"4px 0"}}>
-      <span style={{fontSize:20}}>{icon}</span>
-      <span style={{fontSize:8,fontWeight:900,letterSpacing:.8,color:tab===tKey?"#EF4444":"#666"}}>{label.toUpperCase()}</span>
-    </button>
-  );
+  const NavBtn=({tKey,label}:{tKey:string;label:string})=>{
+    const active = tab===tKey;
+    return(
+      <button onClick={()=>setTab(tKey)} style={{flex:1,background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",gap:4,fontFamily:"inherit",padding:"10px 0 0",position:"relative" as const}}>
+        {active&&<span style={{position:"absolute" as const,top:0,left:"20%",right:"20%",height:2,background:"#EF4444",borderRadius:"0 0 2px 2px"}}/>}
+        <span style={{fontSize:11,fontWeight:active?800:600,letterSpacing:.5,color:active?"#fff":"#555",marginTop:2}}>{label}</span>
+      </button>
+    );
+  };
 
   return(
     <div style={{background:"#0A0A0A",minHeight:"100vh",fontFamily:"'Inter',-apple-system,sans-serif",color:"#fff",paddingBottom:80}}>
@@ -784,19 +786,28 @@ export default function PublicPage() {
       )}
 
       {/* ── BOTTOM NAV ── */}
-      {/* Grid: [Feed][Route][FAB-center][Fixed][ghost] — FAB at column 3/5 = true center */}
-      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #111",paddingBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr 56px 1fr 1fr",alignItems:"end",backdropFilter:"blur(20px)",zIndex:99}}>
-        <div style={{padding:"9px 0 0"}}><NavBtn tKey="map"   icon="🗺️" label="Map"/></div>
-        <div style={{padding:"9px 0 0"}}><NavBtn tKey="feed"  icon="📋" label="Feed"/></div>
-        {/* Centre FAB — raised above nav */}
-        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",paddingBottom:0}}>
-          <button onClick={onReport}
-            style={{background:"#EF4444",border:"3px solid #050505",borderRadius:"50%",width:58,height:58,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,position:"relative" as const,bottom:16,boxShadow:"0 4px 24px rgba(239,68,68,0.55)"}}>
+      {/*
+        5 equal flex columns: Map | Feed | [center] | Fixed | ghost
+        Center col sits at 40–60% → mid = 50% → FAB left:50% is exact center.
+        Ghost col mirrors Map col → visually symmetric around the FAB.
+      */}
+      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"1px solid #111",backdropFilter:"blur(20px)"}}>
+        {/* FAB — true center: left 50% = mid of 5-col flex */}
+        <div style={{position:"absolute" as const,top:-26,left:"50%",transform:"translateX(-50%)"}}>
+          <button onClick={onReport} style={{width:54,height:54,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"0 4px 20px rgba(239,68,68,0.6)"}}>
             🚨
           </button>
         </div>
-        <div style={{padding:"9px 0 0"}}><NavBtn tKey="fixed" icon="✅" label="Fixed"/></div>
-        <div/>{/* ghost — mirrors Feed slot for symmetric centering */}
+        <div style={{display:"flex",paddingBottom:20}}>
+          <NavBtn tKey="map"   label="Map"/>
+          <NavBtn tKey="feed"  label="Feed"/>
+          {/* Center slot: FAB floats above, "Report" label anchors it */}
+          <div style={{flex:1,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2}}>
+            <span style={{fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444"}}>REPORT</span>
+          </div>
+          <NavBtn tKey="fixed" label="Fixed"/>
+          <div style={{flex:1}}/>{/* ghost — mirrors Map col */}
+        </div>
       </div>
     </div>
   );
