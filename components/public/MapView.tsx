@@ -35,11 +35,12 @@ interface Props {
 }
 
 export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<maplibregl.Map | null>(null);
-  const markersRef   = useRef<maplibregl.Marker[]>([]);
-  const [ready,      setReady]      = useState(false);
-  const [selected,   setSelected]   = useState<any | null>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const mapRef        = useRef<maplibregl.Map | null>(null);
+  const markersRef    = useRef<maplibregl.Marker[]>([]);
+  const [ready,       setReady]       = useState(false);
+  const [markerCount, setMarkerCount] = useState(0);
+  const [selected,    setSelected]    = useState<any | null>(null);
 
   // Init map once
   useEffect(() => {
@@ -112,6 +113,8 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       markersRef.current.push(marker);
     });
 
+    setMarkerCount(markerCount);
+
     // Fit bounds if we have multiple pins
     if (visible.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
@@ -143,7 +146,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         }}>
           <span style={{ width:5, height:5, borderRadius:"50%", background:"#22C55E", display:"inline-block", boxShadow:"0 0 6px #22C55E" }}/>
           <span style={{ color:"#ccc", fontSize:11, fontWeight:700 }}>
-            {markersRef.current.length} active on map
+            {markerCount} active on map
           </span>
         </div>
       )}
@@ -202,7 +205,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       )}
 
       {/* No-coordinates hint for demo mode */}
-      {ready && markersRef.current.length === 0 && (
+      {ready && markerCount === 0 && (
         <div style={{
           position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
           background:"rgba(10,10,10,0.88)", backdropFilter:"blur(8px)",
