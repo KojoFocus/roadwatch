@@ -1012,14 +1012,14 @@ export default function PublicPage() {
       <div style={{background:"#080808",borderBottom:"1px solid #111",padding:"12px 18px",position:"sticky" as const,top:0,zIndex:50}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <div>
-            <div style={{color:"#EF4444",fontSize:8,fontWeight:900,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
+            <div style={{color:"#333",fontSize:8,fontWeight:700,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
             <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             {/* Push notification bell */}
             <button onClick={subscribePush} aria-label={pushEnabled?"Notifications on":"Enable notifications"}
-              style={{background:"none",border:"none",color:pushEnabled?"#F59E0B":"#444",fontSize:18,lineHeight:1,padding:"4px"}}>
-              {pushEnabled?"🔔":"🔕"}
+              style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:pushEnabled?"#888":"#333",fontSize:12,fontWeight:700}}>
+              {pushEnabled?"●":"○"}
             </button>
 
             {/* Auth */}
@@ -1037,7 +1037,7 @@ export default function PublicPage() {
 
             {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#555",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>DEMO</span>}
             <div style={{background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
-              <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 5px #22C55E"}}/>
+              <span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/>
               <span style={{color:"#555",fontSize:9,fontWeight:700,letterSpacing:1.5}}>LIVE</span>
             </div>
           </div>
@@ -1149,8 +1149,8 @@ export default function PublicPage() {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>CITIZEN REPORTS · {feedReports.length}</div>
               {watching>0&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/>
-                <span style={{color:"#444",fontSize:10}}>{watching} watching</span>
+                <span style={{width:4,height:4,borderRadius:"50%",background:"#333",display:"inline-block"}}/>
+                <span style={{color:"#333",fontSize:10}}>{watching} watching</span>
               </div>}
             </div>
 
@@ -1195,13 +1195,13 @@ export default function PublicPage() {
 
           <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#22C55E",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#444",flexShrink:0}}/>
               <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="From — e.g. Spintex Road"
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#EF4444",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#333",flexShrink:0}}/>
               <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="To — e.g. Tema Motorway"
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
@@ -1257,13 +1257,13 @@ export default function PublicPage() {
           <div style={{position:"absolute" as const,top:0,left:0,right:0,zIndex:10,background:"rgba(5,5,5,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid #111",padding:"10px 14px"}}>
             <div style={{display:"flex",gap:7}}>
               <div style={{flex:1,position:"relative" as const}}>
-                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#22C55E"}}/>
+                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#333"}}/>
                 <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                   placeholder="From"
                   style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               </div>
               <div style={{flex:1,position:"relative" as const}}>
-                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#EF4444"}}/>
+                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#333"}}/>
                 <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                   placeholder="To"
                   style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
@@ -1320,7 +1320,7 @@ export default function PublicPage() {
             <div style={{color:"#666",fontSize:11}}>Works offline · No app store needed</div>
           </div>
           <button onClick={async()=>{installPrompt?.prompt();const r=await installPrompt?.userChoice;if(r?.outcome==="accepted")setShowInstall(false);}}
-            style={{background:"#EF4444",border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>Add</button>
+            style={{background:"#fff",border:"none",borderRadius:10,padding:"8px 14px",color:"#000",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>Add</button>
           <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:"#444",fontSize:20,lineHeight:1}}>×</button>
         </div>
       )}
@@ -1361,7 +1361,7 @@ export default function PublicPage() {
                         {gps.status==="locating"
                           ?<><div style={{width:7,height:7,border:"1.5px solid #333",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}} aria-hidden="true"/><span style={{color:"#555"}}>Getting location…</span></>
                           :gps.status==="live"
-                          ?<><span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}} aria-hidden="true"/><span style={{color:"#4ade80"}}>GPS locked · {gps.address}</span></>
+                          ?<><span style={{width:4,height:4,borderRadius:"50%",background:"#666",display:"inline-block"}} aria-hidden="true"/><span style={{color:"#888"}}>GPS locked · {gps.address}</span></>
                           :<><span style={{width:4,height:4,borderRadius:"50%",background:"#555",display:"inline-block"}} aria-hidden="true"/><span style={{color:"#555"}}>Location ready</span></>
                         }
                       </div>

@@ -266,7 +266,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       {/* Pin count badge */}
       {ready && (
         <div style={{ position:"absolute", top:10, left:10, background:"rgba(10,10,10,0.85)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"5px 12px", display:"flex", alignItems:"center", gap:6 }}>
-          <span style={{ width:5, height:5, borderRadius:"50%", background:"#22C55E", display:"inline-block", boxShadow:"0 0 6px #22C55E" }}/>
+          <span style={{ width:4, height:4, borderRadius:"50%", background:"#444", display:"inline-block" }}/>
           <span style={{ color:"#ccc", fontSize:11, fontWeight:700 }}>{pinCount} active</span>
         </div>
       )}
