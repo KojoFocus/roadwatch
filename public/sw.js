@@ -1,5 +1,5 @@
 // RoadWatch Ghana — App Shell Service Worker
-const CACHE = "roadwatch-v3";
+const CACHE = "roadwatch-v4";
 const SHELL = ["/manifest.json"];
 
 self.addEventListener("install", e => {
@@ -54,5 +54,32 @@ self.addEventListener("fetch", e => {
       }
       return res;
     }))
+  );
+});
+
+// Push notifications
+self.addEventListener("push", e => {
+  if (!e.data) return;
+  let payload;
+  try { payload = e.data.json(); } catch { payload = { title: "RoadWatch Ghana", body: e.data.text() }; }
+  e.waitUntil(
+    self.registration.showNotification(payload.title || "RoadWatch Ghana", {
+      body:    payload.body || "New road hazard reported near you.",
+      icon:    payload.icon || "/icons/icon-192.svg",
+      badge:   "/icons/icon-192.svg",
+      vibrate: [200, 100, 200],
+      data:    payload.data || {},
+      actions: [{ action: "view", title: "View Map" }],
+    })
+  );
+});
+
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: "window" }).then(ws => {
+      if (ws.length > 0) { ws[0].focus(); return ws[0].navigate("/"); }
+      return clients.openWindow("/");
+    })
   );
 });

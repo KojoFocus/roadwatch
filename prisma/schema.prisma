@@ -118,6 +118,18 @@ model Announcement {
   @@index([createdAt])
 }
 
+// ─── PUSH SUBSCRIPTION ───────────────────────────────────────────────────────
+model PushSubscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userId    String?
+
+  @@index([userId])
+}
+
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
 enum HazardType {
   POTHOLE

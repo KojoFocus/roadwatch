@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic                                       from "next/dynamic";
 import { uploadPhoto }                               from "@/lib/supabase";
+import { supabase, signInWithGoogle, sendPhoneOTP, verifyPhoneOTP, signOut } from "@/lib/supabase-auth";
 
 const MapView = dynamic(() => import("@/components/public/MapView"), {
   ssr:     false,
@@ -86,6 +87,13 @@ async function revGeo(lat: number, lng: number): Promise<string|null> {
     const d = await r.json(); const a = d.address;
     return [a?.road||a?.pedestrian, a?.neighbourhood||a?.suburb||a?.town].filter(Boolean).slice(0,2).join(", ")||null;
   } catch { return null; }
+}
+
+function urlBase64ToUint8Array(base64: string) {
+  const pad = "=".repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(b64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
 // ─── SKELETON CARD ────────────────────────────────────────────────────────────
@@ -209,7 +217,7 @@ function VoiceButton({ onResult, tip }: { onResult:(r:any)=>void; tip:string }) 
 const STEP_ORDER = ["type","sev","photo","confirm"] as const;
 type FormStep = typeof STEP_ORDER[number];
 
-function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang:Lang }) {
+function ReportForm({ gps, onDone, lang, userId }: { gps:any; onDone:(r:any)=>void; lang:Lang; userId?:string }) {
   const [step,       setStep]       = useState<FormStep>("type");
   const [form,       setForm]       = useState({hazardType:"",severity:"",photoUrl:"",preview:""});
   const [uploading,  setUploading]  = useState(false);
@@ -256,10 +264,10 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
       hazardType: form.hazardType,
       severity:   form.severity || "MEDIUM",
       photoUrl:   form.photoUrl || null,
+      reporter:   userId        || null,
     };
     const fallback = { id:`local-${Date.now()}`, createdAt:new Date().toISOString(), status:"PENDING", upvoteCount:1, ...payload };
 
-    // Offline — queue and return immediately
     if (!navigator.onLine) {
       const q = getQueue(); q.push(payload); saveQueue(q);
       onDone({ ...fallback, _queued:true }); return;
@@ -270,7 +278,6 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
       const json = await res.json();
       if (json.success) { onDone(json.data); return; }
     } catch {
-      // Network failed mid-flight — queue for retry
       const q = getQueue(); q.push(payload); saveQueue(q);
       onDone({ ...fallback, _queued:true }); return;
     }
@@ -458,7 +465,6 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
       animation: isNew ? "newReport .35s ease" : "fadeUp .2s ease",
       boxShadow: isNew ? `0 0 24px ${color}18` : "none",
     }}>
-      {/* Photo header — full-bleed with gradient overlay */}
       <div style={{position:"relative" as const, height: r.photoUrl ? 190 : 88, overflow:"hidden"}}>
         {r.photoUrl ? (
           <>
@@ -466,36 +472,20 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
             <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(to top, rgba(8,8,8,0.96) 0%, rgba(8,8,8,0.3) 55%, transparent 100%)"}}/>
           </>
         ) : (
-          <div style={{
-            width:"100%", height:"100%",
-            background:`linear-gradient(135deg, ${color}14 0%, ${color}06 100%)`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            borderBottom:`1px solid ${color}18`,
-          }}>
+          <div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${color}14 0%, ${color}06 100%)`,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:`1px solid ${color}18`}}>
             <span style={{fontSize:40, opacity:.5}}>{h.e}</span>
           </div>
         )}
-
-        {/* Severity badge — top right */}
         <div style={{position:"absolute" as const,top:10,right:10}}>
-          <span style={{
-            color:color, fontSize:9, fontWeight:900,
-            background:"rgba(8,8,8,0.88)", backdropFilter:"blur(8px)",
-            border:`1px solid ${color}40`, borderRadius:20,
-            padding:"4px 10px", letterSpacing:.8,
-          }}>
+          <span style={{color:color,fontSize:9,fontWeight:900,background:"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${color}40`,borderRadius:20,padding:"4px 10px",letterSpacing:.8}}>
             {SEV_LABEL[r.severity]||r.severity}
           </span>
         </div>
-
-        {/* "Just in" badge — top left */}
         {isNew&&(
           <div style={{position:"absolute" as const,top:10,left:10,background:"#EF4444",borderRadius:20,padding:"4px 9px"}}>
             <span style={{color:"#fff",fontSize:9,fontWeight:900,letterSpacing:.8}}>JUST IN</span>
           </div>
         )}
-
-        {/* Hazard label overlaid on photo */}
         {r.photoUrl&&(
           <div style={{position:"absolute" as const,bottom:10,left:13,right:48,display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:22,flexShrink:0}}>{h.e}</span>
@@ -507,9 +497,7 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
         )}
       </div>
 
-      {/* Card body */}
       <div style={{padding:"12px 14px"}}>
-        {/* No-photo: show title here */}
         {!r.photoUrl&&(
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
             <div style={{width:44,height:44,borderRadius:12,background:`${color}14`,border:`1px solid ${color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
@@ -521,8 +509,6 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
             </div>
           </div>
         )}
-
-        {/* Status + time row */}
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
           <div style={{background:`${color}10`,border:`1px solid ${color}22`,borderRadius:6,padding:"2px 7px",flexShrink:0}}>
             <span style={{color:color,fontSize:9,fontWeight:800,letterSpacing:.5}}>{ST_LABEL[r.status]||r.status}</span>
@@ -533,28 +519,12 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
             <><span style={{color:"#2a2a2a",fontSize:10}}>·</span><span style={{color:"#444",fontSize:11}}>{r.region}</span></>
           )}
         </div>
-
-        {/* Actions */}
         <div style={{display:"flex",gap:8}}>
           <button onClick={onConfirm} disabled={confirmed}
-            style={{
-              flex:1,
-              background:confirmed?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",
-              border:`1px solid ${confirmed?"rgba(34,197,94,0.28)":"rgba(255,255,255,0.06)"}`,
-              borderRadius:10, padding:"12px",
-              color:confirmed?"#22C55E":"#888",
-              fontWeight:700, fontSize:13, fontFamily:"inherit",
-              display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-              transition:"all .2s",
-            }}>
-            {confirmed
-              ?<><span style={{fontSize:14}}>✓</span> Confirmed · {r.upvoteCount||0}</>
-              :<><span style={{fontSize:14}}>👍</span> I see this · {r.upvoteCount||0}</>
-            }
+            style={{flex:1,background:confirmed?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${confirmed?"rgba(34,197,94,0.28)":"rgba(255,255,255,0.06)"}`,borderRadius:10,padding:"12px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s"}}>
+            {confirmed?<><span style={{fontSize:14}}>✓</span> Confirmed · {r.upvoteCount||0}</>:<><span style={{fontSize:14}}>👍</span> I see this · {r.upvoteCount||0}</>}
           </button>
-          <button onClick={()=>shareWhatsApp(r)}
-            style={{background:"rgba(37,211,102,0.06)",border:"1px solid rgba(37,211,102,0.15)",borderRadius:10,padding:"12px 14px",color:"#25D366",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
-            title="Share on WhatsApp">
+          <button onClick={()=>shareWhatsApp(r)} style={{background:"rgba(37,211,102,0.06)",border:"1px solid rgba(37,211,102,0.15)",borderRadius:10,padding:"12px 14px",color:"#25D366",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Share on WhatsApp">
             📤
           </button>
         </div>
@@ -564,10 +534,10 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
 }
 
 // ─── SUCCESS SCREEN ───────────────────────────────────────────────────────────
-function SuccessScreen({ r, onClose }: { r: any; onClose: () => void }) {
-  const h       = hMeta(r.hazardType);
-  const queued  = !!r._queued;
-  const hasPhoto= !!r.photoUrl;
+function SuccessScreen({ r, onClose, onSignIn, user }: { r:any; onClose:()=>void; onSignIn?:()=>void; user?:any }) {
+  const h      = hMeta(r.hazardType);
+  const queued = !!r._queued;
+  const hasPhoto = !!r.photoUrl;
 
   return (
     <div role="alert" aria-live="assertive"
@@ -590,7 +560,7 @@ function SuccessScreen({ r, onClose }: { r: any; onClose: () => void }) {
       </div>
 
       <div style={{fontSize:40,margin:"20px 0 8px"}}>{h.e}</div>
-      <div style={{color:"#555",fontSize:13,marginBottom:32}}>{h.label} · {r.address||"Accra, Ghana"}</div>
+      <div style={{color:"#555",fontSize:13,marginBottom:28}}>{h.label} · {r.address||"Accra, Ghana"}</div>
 
       {!queued&&(
         <button onClick={()=>shareWhatsApp(r)} aria-label="Share this report on WhatsApp"
@@ -598,10 +568,173 @@ function SuccessScreen({ r, onClose }: { r: any; onClose: () => void }) {
           📤 Share on WhatsApp
         </button>
       )}
+
+      {!queued && !user && onSignIn && (
+        <button onClick={onSignIn}
+          style={{width:"100%",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:14,padding:"15px",color:"#60A5FA",fontWeight:700,fontSize:14,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+          🔐 Sign in to track this report
+        </button>
+      )}
+
       <button onClick={onClose} aria-label="Close and return to feed"
         style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"15px",color:"#888",fontWeight:700,fontSize:15,fontFamily:"inherit"}}>
         Done
       </button>
+    </div>
+  );
+}
+
+// ─── ONBOARDING OVERLAY ───────────────────────────────────────────────────────
+const ONBOARD_STEPS = [
+  { icon:"🗺️",  title:"See Ghana's roads",       body:"Real-time road hazard map updated by citizens across Greater Accra and beyond."  },
+  { icon:"🚨",  title:"Report in 30 seconds",    body:"Tap the red button, pick the hazard type, add a photo. It's live on the map instantly." },
+  { icon:"👥",  title:"Help your community",     body:"Confirm hazards others report. More confirmations → more alerts to more drivers."  },
+];
+
+function OnboardingOverlay({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0);
+  const s = ONBOARD_STEPS[step];
+  const last = step === ONBOARD_STEPS.length - 1;
+
+  const finish = () => {
+    localStorage.setItem("rw_onboarded", "1");
+    onDone();
+  };
+
+  return (
+    <div style={{position:"fixed" as const,inset:0,zIndex:500,background:"rgba(0,0,0,0.96)",backdropFilter:"blur(10px)",display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",padding:"32px 24px",animation:"fadeUp .3s ease"}}>
+      <button onClick={finish} style={{position:"absolute" as const,top:20,right:20,background:"none",border:"none",color:"#444",fontSize:22,lineHeight:1}}>×</button>
+
+      {/* Step dots */}
+      <div style={{display:"flex",gap:6,marginBottom:40}}>
+        {ONBOARD_STEPS.map((_,i)=>(
+          <div key={i} style={{width:i===step?20:6,height:6,borderRadius:3,background:i===step?"#EF4444":"#222",transition:"all .25s"}}/>
+        ))}
+      </div>
+
+      <div style={{fontSize:72,marginBottom:24,animation:"successPop .4s ease"}}>{s.icon}</div>
+      <div style={{color:"#fff",fontWeight:900,fontSize:24,marginBottom:12,letterSpacing:-.5,textAlign:"center" as const}}>{s.title}</div>
+      <div style={{color:"#666",fontSize:15,lineHeight:1.65,textAlign:"center" as const,maxWidth:300,marginBottom:48}}>{s.body}</div>
+
+      <button onClick={last ? finish : ()=>setStep(s=>s+1)}
+        style={{width:"100%",maxWidth:300,background:"#EF4444",border:"none",borderRadius:14,padding:"18px",color:"#fff",fontWeight:800,fontSize:17,fontFamily:"inherit"}}>
+        {last ? "Get started" : "Next"}
+      </button>
+    </div>
+  );
+}
+
+// ─── AUTH MODAL ───────────────────────────────────────────────────────────────
+function AuthModal({ onClose, onSuccess }: { onClose:()=>void; onSuccess:()=>void }) {
+  const [mode,    setMode]    = useState<"start"|"otp">("start");
+  const [phone,   setPhone]   = useState("");
+  const [otp,     setOtp]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState<string|null>(null);
+
+  const handleGoogle = async () => {
+    setLoading(true); setError(null);
+    try {
+      const { error: e } = await signInWithGoogle();
+      if (e) setError(e.message);
+    } catch { setError("Something went wrong. Try again."); }
+    finally { setLoading(false); }
+  };
+
+  const handleSendOTP = async () => {
+    if (!phone.trim()) { setError("Enter your phone number"); return; }
+    setLoading(true); setError(null);
+    const normalized = phone.startsWith("+") ? phone : `+233${phone.replace(/^0/, "")}`;
+    try {
+      const { error: e } = await sendPhoneOTP(normalized);
+      if (e) setError(e.message);
+      else setMode("otp");
+    } catch { setError("Failed to send code"); }
+    finally { setLoading(false); }
+  };
+
+  const handleVerify = async () => {
+    if (!otp.trim()) return;
+    setLoading(true); setError(null);
+    const normalized = phone.startsWith("+") ? phone : `+233${phone.replace(/^0/, "")}`;
+    try {
+      const { error: e } = await verifyPhoneOTP(normalized, otp);
+      if (e) setError(e.message);
+      else { onSuccess(); onClose(); }
+    } catch { setError("Invalid code. Try again."); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{position:"fixed" as const,inset:0,zIndex:250}} role="dialog" aria-modal="true" aria-label="Sign in">
+      <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)"}} onClick={onClose} aria-hidden="true"/>
+      <div style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0A0A0A",borderRadius:"20px 20px 0 0",border:"1px solid #1a1a1a",borderBottom:"none",padding:"24px 20px 40px",animation:"slideUp .26s cubic-bezier(.32,.72,0,1)"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}}/>
+        </div>
+        <div style={{textAlign:"center" as const,marginBottom:24}}>
+          <div style={{fontSize:28,marginBottom:8}}>🔐</div>
+          <div style={{color:"#fff",fontWeight:800,fontSize:20,letterSpacing:-.3,marginBottom:6}}>Sign in to RoadWatch</div>
+          <div style={{color:"#555",fontSize:13}}>Track your reports · Get hazard alerts</div>
+        </div>
+
+        {error&&(
+          <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"10px 12px",marginBottom:14,color:"#EF4444",fontSize:13,textAlign:"center" as const}}>
+            {error}
+          </div>
+        )}
+
+        {/* Google */}
+        <button onClick={handleGoogle} disabled={loading}
+          style={{width:"100%",background:"#fff",border:"none",borderRadius:12,padding:"14px",color:"#111",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:16,opacity:loading?.6:1}}>
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          {loading ? "Signing in…" : "Continue with Google"}
+        </button>
+
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
+          <span style={{color:"#333",fontSize:12}}>or</span>
+          <div style={{flex:1,height:1,background:"#1a1a1a"}}/>
+        </div>
+
+        {/* Phone OTP */}
+        {mode==="start"&&(
+          <>
+            <div style={{position:"relative" as const,marginBottom:10}}>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",color:"#555",fontSize:13,pointerEvents:"none" as const}}>🇬🇭</span>
+              <input value={phone} onChange={e=>setPhone(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleSendOTP()}
+                placeholder="Phone number (e.g. 0241234567)"
+                style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:12,padding:"13px 12px 13px 38px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+            </div>
+            <button onClick={handleSendOTP} disabled={loading||!phone.trim()}
+              style={{width:"100%",background:phone.trim()?"rgba(239,68,68,0.1)":"#0D0D0D",border:`1px solid ${phone.trim()?"rgba(239,68,68,0.35)":"#1a1a1a"}`,borderRadius:12,padding:"13px",color:phone.trim()?"#EF4444":"#333",fontWeight:700,fontSize:14,fontFamily:"inherit",opacity:loading?.6:1}}>
+              {loading ? "Sending…" : "Send code via SMS"}
+            </button>
+          </>
+        )}
+
+        {mode==="otp"&&(
+          <>
+            <div style={{color:"#888",fontSize:13,textAlign:"center" as const,marginBottom:12}}>
+              Code sent to {phone.startsWith("+") ? phone : `+233${phone.replace(/^0/,"")}`}
+              <button onClick={()=>setMode("start")} style={{background:"none",border:"none",color:"#EF4444",fontSize:13,marginLeft:6,fontFamily:"inherit"}}>Change</button>
+            </div>
+            <input value={otp} onChange={e=>setOtp(e.target.value)} maxLength={6}
+              onKeyDown={e=>e.key==="Enter"&&handleVerify()}
+              placeholder="6-digit code"
+              style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:12,padding:"13px",color:"#ccc",fontSize:22,fontFamily:"inherit",outline:"none",textAlign:"center" as const,letterSpacing:8,marginBottom:10}}/>
+            <button onClick={handleVerify} disabled={loading||otp.length<4}
+              style={{width:"100%",background:otp.length>=4?"#EF4444":"#111",border:"none",borderRadius:12,padding:"14px",color:otp.length>=4?"#fff":"#333",fontWeight:700,fontSize:15,fontFamily:"inherit",opacity:loading?.6:1}}>
+              {loading ? "Verifying…" : "Verify code"}
+            </button>
+          </>
+        )}
+
+        <div style={{color:"#333",fontSize:11,textAlign:"center" as const,marginTop:16,lineHeight:1.5}}>
+          Phone OTP requires Twilio configured in Supabase.
+        </div>
+      </div>
     </div>
   );
 }
@@ -624,6 +757,7 @@ export default function PublicPage() {
   const [routeFrom,     setRouteFrom]     = useState("");
   const [routeTo,       setRouteTo]       = useState("");
   const [routeResult,   setRouteResult]   = useState<any[]|null>(null);
+  const [safetyScore,   setSafetyScore]   = useState<number|null>(null);
   const [checking,      setChecking]      = useState(false);
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState<string|null>(null);
@@ -633,15 +767,52 @@ export default function PublicPage() {
   const [isOnline,      setIsOnline]      = useState(true);
   const [queueCount,    setQueueCount]    = useState(0);
   const [flushing,      setFlushing]      = useState(false);
+  const [user,          setUser]          = useState<any>(null);
+  const [showAuth,      setShowAuth]      = useState(false);
+  const [onboarded,     setOnboarded]     = useState(true);
+  const [pushEnabled,   setPushEnabled]   = useState(false);
   const fabRef   = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const dismissToast = useCallback(() => setToast(null), []);
 
+  const subscribePush = useCallback(async () => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+        });
+      }
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub),
+      });
+      setPushEnabled(true);
+    } catch {}
+  }, []);
+
   useEffect(()=>{
     setWatching(Math.floor(Math.random()*18)+14);
     setIsOnline(navigator.onLine);
     setQueueCount(getQueue().length);
+
+    // Onboarding check
+    if (!localStorage.getItem("rw_onboarded")) setOnboarded(false);
+
+    // Auth state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     fetch("/api/reports").then(r=>r.json()).then(j=>{
       if(j.success&&j.data.length>0){setReports(j.data);setIsDemo(false);}
@@ -654,7 +825,6 @@ export default function PublicPage() {
     const handler=(e:any)=>{e.preventDefault();setInstallPrompt(e);setShowInstall(true);};
     window.addEventListener("beforeinstallprompt",handler);
 
-    // Online / offline
     const goOnline = async () => {
       setIsOnline(true);
       const q = getQueue();
@@ -672,7 +842,7 @@ export default function PublicPage() {
       setQueueCount(remaining.length);
       setFlushing(false);
       const sent = q.length - remaining.length;
-      if (sent>0) setToast(`✅ ${sent} queued report${sent!==1?"s":""} submitted`);
+      if (sent>0) setToast(`${sent} queued report${sent!==1?"s":""} submitted`);
     };
     const goOffline = () => setIsOnline(false);
     window.addEventListener("online",  goOnline);
@@ -683,19 +853,19 @@ export default function PublicPage() {
       window.removeEventListener("online",  goOnline);
       window.removeEventListener("offline", goOffline);
       clearTimeout(t);
+      authSub.unsubscribe();
     };
   },[]);
 
-  // Fake live update: new report drops in after ~28s to demo the live feel
+  // Fake live update after ~28s
   useEffect(()=>{
     const HAZARDS = [
-      { hazardType:"POTHOLE", address:"Lapaz", severity:"HIGH"     },
+      { hazardType:"POTHOLE", address:"Lapaz",  severity:"HIGH"     },
       { hazardType:"FLOOD",   address:"Madina", severity:"CRITICAL" },
-      { hazardType:"DEBRIS",  address:"Adenta", severity:"MEDIUM"  },
+      { hazardType:"DEBRIS",  address:"Adenta", severity:"MEDIUM"   },
     ];
     const pick = HAZARDS[Math.floor(Math.random()*HAZARDS.length)];
     const id   = `live-${Date.now()}`;
-
     const t = setTimeout(()=>{
       const h = hMeta(pick.hazardType);
       const liveReport = {
@@ -708,10 +878,8 @@ export default function PublicPage() {
       setReports(p=>[liveReport,...p]);
       setNewReportIds(s=>new Set([...s,id]));
       setToast(`${h.e} ${SEV_LABEL[pick.severity]} hazard reported at ${pick.address}`);
-      // Clear "new" badge after 8s
       setTimeout(()=>setNewReportIds(s=>{const n=new Set(s);n.delete(id);return n;}),8000);
     }, 28000);
-
     return ()=>clearTimeout(t);
   },[]);
 
@@ -725,7 +893,7 @@ export default function PublicPage() {
     );
   };
 
-  // Focus management for modal
+  // Modal focus management
   useEffect(()=>{
     if (!reporting) { fabRef.current?.focus(); return; }
     const id = requestAnimationFrame(()=>{
@@ -756,27 +924,36 @@ export default function PublicPage() {
 
   const checkRoute=async()=>{
     if(!routeFrom.trim()||!routeTo.trim()) return;
-    setChecking(true); setRouteResult(null);
+    setChecking(true); setRouteResult(null); setSafetyScore(null);
     await new Promise(r=>setTimeout(r,500));
     const terms=[routeFrom,routeTo].map(s=>s.toLowerCase());
     const hits=reports
       .filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED")
       .filter(r=>terms.some(t=>[(r.address||"").toLowerCase(),(r.landmark||"").toLowerCase(),(r.region||"").toLowerCase()].some(f=>f.includes(t))))
       .sort((a,b)=>SO[a.severity]-SO[b.severity]);
+
+    const crit = hits.filter(r=>r.severity==="CRITICAL").length;
+    const high = hits.filter(r=>r.severity==="HIGH").length;
+    const med  = hits.filter(r=>r.severity==="MEDIUM").length;
+    setSafetyScore(Math.max(0, 10 - (crit*3 + high*2 + med*1)));
     setRouteResult(hits); setChecking(false);
   };
 
   // ── Derived state ──
-  const sq = search.trim().toLowerCase();
+  const sq             = search.trim().toLowerCase();
   const activeReports  = reports.filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED");
   const fixedReports   = reports.filter(r=>r.status==="RESOLVED"&&r.resolutionNote).sort((a,b)=>new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
   const feedReports    = activeReports
     .filter(r=>hazardFilter==="All"||r.hazardType===hazardFilter)
     .filter(r=>!sq||[(r.address||""),(r.landmark||""),(r.region||"")].some(f=>f.toLowerCase().includes(sq)))
     .sort((a,b)=>SO[a.severity]-SO[b.severity]||new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+  const myReports      = user ? reports.filter(r=>r.reporter===user.id) : [];
   const criticalCount  = activeReports.filter(r=>r.severity==="CRITICAL").length;
   const totalConfirmed = reports.reduce((s,r)=>s+(r.upvoteCount||0),0);
   const visibleAnnouncements = announcements.filter(a=>!dismissed.has(a.id));
+
+  const scoreColor = (s:number) => s>=8?"#22C55E":s>=5?"#F59E0B":s>=3?"#F97316":"#EF4444";
+  const scoreLabel = (s:number) => s>=8?"SAFE":s>=5?"USE CAUTION":s>=3?"RISKY":"DANGEROUS";
 
   const NavBtn=({tKey,label}:{tKey:string;label:string})=>{
     const active = tab===tKey;
@@ -807,6 +984,12 @@ export default function PublicPage() {
         ::-webkit-scrollbar{display:none}
       `}</style>
 
+      {/* ── ONBOARDING ── */}
+      {!onboarded && <OnboardingOverlay onDone={() => setOnboarded(true)}/>}
+
+      {/* ── AUTH MODAL ── */}
+      {showAuth && <AuthModal onClose={()=>setShowAuth(false)} onSuccess={()=>setShowAuth(false)}/>}
+
       {/* ── OFFLINE / QUEUE BANNER ── */}
       {!isOnline&&(
         <div role="alert" style={{position:"fixed" as const,top:0,left:0,right:0,zIndex:400,background:"rgba(20,10,0,0.97)",borderBottom:"1px solid rgba(245,158,11,0.3)",padding:"8px 16px",display:"flex",alignItems:"center",gap:8}}>
@@ -832,7 +1015,26 @@ export default function PublicPage() {
             <div style={{color:"#EF4444",fontSize:8,fontWeight:900,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
             <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            {/* Push notification bell */}
+            <button onClick={subscribePush} aria-label={pushEnabled?"Notifications on":"Enable notifications"}
+              style={{background:"none",border:"none",color:pushEnabled?"#F59E0B":"#444",fontSize:18,lineHeight:1,padding:"4px"}}>
+              {pushEnabled?"🔔":"🔕"}
+            </button>
+
+            {/* Auth */}
+            {user ? (
+              <button onClick={()=>signOut().then(()=>setUser(null))}
+                style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#888",fontSize:10,fontWeight:700,fontFamily:"inherit",letterSpacing:.5}}>
+                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · Sign out
+              </button>
+            ) : (
+              <button onClick={()=>setShowAuth(true)}
+                style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:20,padding:"5px 11px",color:"#60A5FA",fontSize:10,fontWeight:800,letterSpacing:.5,fontFamily:"inherit"}}>
+                Sign in
+              </button>
+            )}
+
             {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#555",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>DEMO</span>}
             <div style={{background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
               <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 6px #22C55E"}}/>
@@ -902,6 +1104,30 @@ export default function PublicPage() {
               </div>
             )}
 
+            {/* My Reports (signed-in users) */}
+            {user && myReports.length > 0 && (
+              <div style={{marginBottom:16}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                  <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#60A5FA"}}>MY REPORTS · {myReports.length}</div>
+                </div>
+                {myReports.slice(0,3).map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
+                <div style={{height:1,background:"#141414",margin:"16px 0"}}/>
+              </div>
+            )}
+
+            {/* Sign-in nudge for non-users */}
+            {!user && (
+              <button onClick={()=>setShowAuth(true)}
+                style={{width:"100%",background:"rgba(96,165,250,0.05)",border:"1px solid rgba(96,165,250,0.12)",borderRadius:12,padding:"11px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,textAlign:"left" as const}}>
+                <span style={{fontSize:16}}>🔐</span>
+                <div style={{flex:1}}>
+                  <div style={{color:"#60A5FA",fontWeight:700,fontSize:13}}>Sign in to track your reports</div>
+                  <div style={{color:"#444",fontSize:11,marginTop:1}}>See your submissions · Get hazard alerts</div>
+                </div>
+                <span style={{color:"#555",fontSize:14}}>›</span>
+              </button>
+            )}
+
             {/* Search */}
             <div style={{position:"relative" as const,marginBottom:10}}>
               <span style={{position:"absolute" as const,left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" as const}}>🔍</span>
@@ -921,7 +1147,6 @@ export default function PublicPage() {
               ))}
             </div>
 
-            {/* Section heading */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>CITIZEN REPORTS · {feedReports.length}</div>
               {watching>0&&<div style={{display:"flex",alignItems:"center",gap:4}}>
@@ -930,10 +1155,8 @@ export default function PublicPage() {
               </div>}
             </div>
 
-            {/* Skeleton loading */}
             {loading&&[0,1,2].map(i=><SkeletonCard key={i}/>)}
 
-            {/* Report cards */}
             {!loading&&(feedReports.length===0
               ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
                 <div style={{fontSize:44,marginBottom:12,opacity:.6}}>👁️</div>
@@ -946,7 +1169,6 @@ export default function PublicPage() {
               :feedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)} isNew={newReportIds.has(r.id)}/>)
             )}
 
-            {/* Recently Fixed divider */}
             {!loading&&fixedReports.length>0&&(
               <>
                 <div style={{display:"flex",alignItems:"center",gap:10,margin:"28px 0 14px"}}>
@@ -975,15 +1197,13 @@ export default function PublicPage() {
           <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
             <div style={{position:"relative" as const}}>
               <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#22C55E",flexShrink:0}}/>
-              <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+              <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="From — e.g. Spintex Road"
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <div style={{position:"relative" as const}}>
               <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#EF4444",flexShrink:0}}/>
-              <input value={routeTo} onChange={e=>setRouteTo(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+              <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="To — e.g. Tema Motorway"
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
@@ -992,6 +1212,20 @@ export default function PublicPage() {
               {checking?<><div style={{width:16,height:16,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>🔍 Check Route</>}
             </button>
           </div>
+
+          {/* Safety score */}
+          {safetyScore!==null&&(
+            <div style={{background:`rgba(${safetyScore>=8?"34,197,94":safetyScore>=5?"245,158,11":safetyScore>=3?"249,115,22":"239,68,68"},0.07)`,border:`1px solid rgba(${safetyScore>=8?"34,197,94":safetyScore>=5?"245,158,11":safetyScore>=3?"249,115,22":"239,68,68"},0.2)`,borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+              <div style={{textAlign:"center" as const,flexShrink:0}}>
+                <div style={{color:scoreColor(safetyScore),fontSize:28,fontWeight:900,lineHeight:1}}>{safetyScore}</div>
+                <div style={{color:"#555",fontSize:10,marginTop:1}}>/ 10</div>
+              </div>
+              <div>
+                <div style={{color:scoreColor(safetyScore),fontWeight:800,fontSize:14,letterSpacing:.5}}>{scoreLabel(safetyScore)}</div>
+                <div style={{color:"#555",fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
+              </div>
+            </div>
+          )}
 
           {routeResult!==null&&(
             <div style={{animation:"fadeUp .15s ease"}}>
@@ -1025,15 +1259,13 @@ export default function PublicPage() {
             <div style={{display:"flex",gap:7}}>
               <div style={{flex:1,position:"relative" as const}}>
                 <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#22C55E"}}/>
-                <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+                <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                   placeholder="From"
                   style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               </div>
               <div style={{flex:1,position:"relative" as const}}>
                 <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#EF4444"}}/>
-                <input value={routeTo} onChange={e=>setRouteTo(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&checkRoute()}
+                <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                   placeholder="To"
                   style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               </div>
@@ -1042,14 +1274,25 @@ export default function PublicPage() {
                 {checking?<div style={{width:14,height:14,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>:"🔍"}
               </button>
             </div>
-            {routeResult!==null&&(
-              <div style={{marginTop:6,fontSize:10,fontWeight:700,letterSpacing:1.5,color:routeResult.length===0?"#22C55E":"#F59E0B"}}>
-                {routeResult.length===0?"✓ NO HAZARDS ON THIS ROUTE":`⚠ ${routeResult.length} HAZARD${routeResult.length!==1?"S":""} FOUND — SEE PINS ON MAP`}
+            {/* Safety score on map */}
+            {safetyScore!==null&&(
+              <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{color:scoreColor(safetyScore),fontSize:11,fontWeight:900,letterSpacing:1}}>
+                  {scoreLabel(safetyScore)} · {safetyScore}/10
+                </span>
+                {routeResult&&routeResult.length>0&&(
+                  <span style={{color:"#555",fontSize:10}}>⚠ {routeResult.length} hazard{routeResult.length!==1?"s":""} on route</span>
+                )}
+              </div>
+            )}
+            {safetyScore===null&&routeResult!==null&&(
+              <div style={{marginTop:6,fontSize:10,fontWeight:700,letterSpacing:1.5,color:"#22C55E"}}>
+                ✓ NO HAZARDS ON THIS ROUTE
               </div>
             )}
           </div>
           {/* Map fills remaining */}
-          <div style={{position:"absolute" as const,top:routeResult!==null?86:54,bottom:0,left:0,right:0}}>
+          <div style={{position:"absolute" as const,top:safetyScore!==null?86:routeResult!==null?72:54,bottom:0,left:0,right:0}}>
             <MapView
               reports={routeResult!==null?routeResult:reports}
               hazardFilter={hazardFilter}
@@ -1099,7 +1342,12 @@ export default function PublicPage() {
               }
             }}>
             {submitted ? (
-              <SuccessScreen r={submitted} onClose={()=>{ setSubmitted(null); setReporting(false); }}/>
+              <SuccessScreen
+                r={submitted}
+                user={user}
+                onClose={()=>{ setSubmitted(null); setReporting(false); }}
+                onSignIn={()=>{ setSubmitted(null); setReporting(false); setShowAuth(true); }}
+              />
             ) : (
               <>
                 <div style={{flexShrink:0}}>
@@ -1128,7 +1376,7 @@ export default function PublicPage() {
                   </div>
                 </div>
                 <div style={{flex:1,overflow:"hidden"}}>
-                  <ReportForm gps={gps} onDone={onSubmit} lang={lang}/>
+                  <ReportForm gps={gps} onDone={onSubmit} lang={lang} userId={user?.id}/>
                 </div>
               </>
             )}
