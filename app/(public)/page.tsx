@@ -81,6 +81,17 @@ function ago(iso: string) {
   return       `${Math.floor(d/86400)}d ago`;
 }
 
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function fmtDist(km: number) {
+  return km < 1 ? `${Math.round(km*1000)}m away` : `${km.toFixed(1)}km away`;
+}
+
 async function revGeo(lat: number, lng: number): Promise<string|null> {
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,{headers:{"Accept-Language":"en"}});
@@ -428,7 +439,7 @@ function shareWhatsApp(r: any) {
 }
 
 // ─── REPORT CARD ──────────────────────────────────────────────────────────────
-function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boolean; onConfirm:()=>void; isNew?:boolean }) {
+function ReportCard({ r, confirmed, onConfirm, isNew, distanceKm }: { r:any; confirmed:boolean; onConfirm:()=>void; isNew?:boolean; distanceKm?:number|null }) {
   const h       = hMeta(r.hazardType);
   const isFixed = r.status === "RESOLVED";
   const color   = SC[r.severity] || "#F59E0B";
@@ -515,8 +526,8 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
           </div>
           <span style={{color:"#2a2a2a",fontSize:10}}>·</span>
           <span style={{color:"#555",fontSize:11}}>{ago(r.createdAt)}</span>
-          {r.region&&(
-            <><span style={{color:"#2a2a2a",fontSize:10}}>·</span><span style={{color:"#444",fontSize:11}}>{r.region}</span></>
+          {distanceKm != null && (
+            <><span style={{color:"#2a2a2a",fontSize:10}}>·</span><span style={{color:distanceKm<2?"#ccc":"#555",fontSize:11,fontWeight:distanceKm<2?700:400}}>{fmtDist(distanceKm)}</span></>
           )}
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -745,7 +756,7 @@ export default function PublicPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [dismissed,     setDismissed]     = useState<Set<string>>(new Set());
   const [isDemo,        setIsDemo]        = useState(true);
-  const [tab,           setTab]           = useState("map");
+  const [tab,           setTab]           = useState("feed");
   const [hazardFilter,  setHazardFilter]  = useState("All");
   const [search,        setSearch]        = useState("");
   const [reporting,     setReporting]     = useState(false);
@@ -805,6 +816,18 @@ export default function PublicPage() {
 
     // Onboarding check
     if (!localStorage.getItem("rw_onboarded")) setOnboarded(false);
+
+    // Auto-request GPS for proximity distances (low accuracy, fast)
+    setGps((g:any)=>({...g,status:"locating"}));
+    navigator.geolocation?.getCurrentPosition(
+      async p=>{
+        const{latitude:lat,longitude:lng}=p.coords;
+        const a=await revGeo(lat,lng);
+        setGps({lat,lng,address:a||`${lat.toFixed(4)}°N`,status:"live"});
+      },
+      ()=>setGps({lat:5.6037,lng:-0.1870,address:"Accra",status:"demo"}),
+      {timeout:8000,enableHighAccuracy:false}
+    );
 
     // Auth state
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -941,12 +964,24 @@ export default function PublicPage() {
 
   // ── Derived state ──
   const sq             = search.trim().toLowerCase();
+  const userLat        = gps.lat as number|null;
+  const userLng        = gps.lng as number|null;
   const activeReports  = reports.filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED");
   const fixedReports   = reports.filter(r=>r.status==="RESOLVED"&&r.resolutionNote).sort((a,b)=>new Date(b.resolvedAt).getTime()-new Date(a.resolvedAt).getTime());
   const feedReports    = activeReports
     .filter(r=>hazardFilter==="All"||r.hazardType===hazardFilter)
     .filter(r=>!sq||[(r.address||""),(r.landmark||""),(r.region||"")].some(f=>f.toLowerCase().includes(sq)))
-    .sort((a,b)=>SO[a.severity]-SO[b.severity]||new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+    .map(r=>({
+      ...r,
+      _dist: (userLat&&userLng&&r.latitude&&r.longitude)
+        ? haversine(userLat,userLng,r.latitude,r.longitude)
+        : null,
+    }))
+    .sort((a:any,b:any)=>{
+      if(a._dist!==null&&b._dist!==null) return a._dist-b._dist;
+      return SO[a.severity]-SO[b.severity]||new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime();
+    });
+  const nearestWarning = feedReports.find((r:any)=>(r.severity==="CRITICAL"||r.severity==="HIGH")&&r._dist!==null) as any|undefined;
   const myReports      = user ? reports.filter(r=>r.reporter===user.id) : [];
   const criticalCount  = activeReports.filter(r=>r.severity==="CRITICAL").length;
   const totalConfirmed = reports.reduce((s,r)=>s+(r.upvoteCount||0),0);
@@ -1065,10 +1100,19 @@ export default function PublicPage() {
 
           {/* Hero CTA */}
           <div style={{padding:"18px 18px 14px",borderBottom:"1px solid #111"}}>
-            {criticalCount>0&&(
-              <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,padding:"9px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:"#EF4444",boxShadow:"0 0 6px #EF4444",flexShrink:0}}/>
-                <span style={{color:"#EF4444",fontSize:12,fontWeight:700}}>{criticalCount} critical hazard{criticalCount!==1?"s":""} on Ghana's roads right now</span>
+            {/* Nearest warning banner */}
+            {nearestWarning && (
+              <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderLeft:"4px solid #EF4444",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+                <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#EF4444",marginBottom:5}}>
+                  ⚠ {SEV_LABEL[nearestWarning.severity].toUpperCase()} — NEAREST HAZARD
+                </div>
+                <div style={{color:"#fff",fontWeight:800,fontSize:16,lineHeight:1.2,marginBottom:3}}>
+                  {hMeta(nearestWarning.hazardType).e} {hMeta(nearestWarning.hazardType).label}
+                </div>
+                <div style={{color:"#777",fontSize:12}}>
+                  {nearestWarning.address}
+                  {nearestWarning._dist!==null&&<span style={{color:"#bbb",fontWeight:700}}> · {fmtDist(nearestWarning._dist)}</span>}
+                </div>
               </div>
             )}
             <div style={{color:"#666",fontSize:13,marginBottom:10}}>See a road hazard?</div>
@@ -1165,7 +1209,7 @@ export default function PublicPage() {
                   🚨 Report a Hazard
                 </button>
               </div>
-              :feedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)} isNew={newReportIds.has(r.id)}/>)
+              :feedReports.map((r:any)=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)} isNew={newReportIds.has(r.id)} distanceKm={r._dist}/>)
             )}
 
             {!loading&&fixedReports.length>0&&(
@@ -1386,7 +1430,7 @@ export default function PublicPage() {
       {/* ── BOTTOM NAV ── */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"1px solid #111",backdropFilter:"blur(20px)"}}>
         <div style={{display:"flex",alignItems:"flex-end",paddingBottom:20}}>
-          <NavBtn tKey="map"  label="Map"/>
+          <NavBtn tKey="feed" label="Feed"/>
           <div style={{flex:1,display:"flex",justifyContent:"center",alignItems:"flex-end"}}>
             <div style={{position:"relative" as const,bottom:14}}>
               <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard" style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"fabPulse 5s ease-in-out infinite"}}>
@@ -1395,7 +1439,7 @@ export default function PublicPage() {
               <div style={{textAlign:"center" as const,marginTop:4,fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444",lineHeight:1}}>REPORT</div>
             </div>
           </div>
-          <NavBtn tKey="feed" label="Feed"/>
+          <NavBtn tKey="map" label="Map"/>
         </div>
       </div>
     </div>
