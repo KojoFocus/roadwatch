@@ -1115,12 +1115,7 @@ export default function PublicPage() {
                 </div>
               </div>
             )}
-            <div style={{color:"#666",fontSize:13,marginBottom:10}}>See a road hazard?</div>
-            <button onClick={onReport}
-              style={{width:"100%",background:"#EF4444",border:"none",borderRadius:14,padding:"17px 20px",color:"#fff",fontWeight:900,fontSize:17,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,animation:"fabPulse 5s ease-in-out infinite",marginBottom:8}}>
-              <span style={{fontSize:22}}>🚨</span> Report It Now
-            </button>
-            <div style={{color:"#444",fontSize:11,textAlign:"center" as const}}>Takes 30 seconds · Helps keep Ghana's roads safe</div>
+            <div style={{color:"#444",fontSize:11,textAlign:"center" as const}}>Tap + below to report a hazard · Takes 30 seconds</div>
           </div>
 
           <div style={{padding:"14px 18px 0"}}>
@@ -1162,7 +1157,6 @@ export default function PublicPage() {
             {!user && (
               <button onClick={()=>setShowAuth(true)}
                 style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"11px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,textAlign:"left" as const}}>
-                <span style={{fontSize:16,opacity:.5}}>🔐</span>
                 <div style={{flex:1}}>
                   <div style={{color:"#888",fontWeight:600,fontSize:13}}>Sign in to track your reports</div>
                   <div style={{color:"#444",fontSize:11,marginTop:1}}>See your submissions · Get hazard alerts</div>
@@ -1173,19 +1167,18 @@ export default function PublicPage() {
 
             {/* Search */}
             <div style={{position:"relative" as const,marginBottom:10}}>
-              <span style={{position:"absolute" as const,left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" as const}}>🔍</span>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"10px 12px 10px 34px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"10px 12px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               {search&&<button onClick={()=>setSearch("")}
                 style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#555",fontSize:18,lineHeight:1}}>×</button>}
             </div>
 
             {/* Hazard filter pills */}
             <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4,marginBottom:16}}>
-              {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
+              {[{key:"All",label:"All"},...H].map(hx=>(
                 <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
                   style={{flexShrink:0,background:hazardFilter===hx.key?"#fff":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"#fff":"#1e1e1e"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#000":"#555",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
-                  {hx.e} {hx.label}
+                  {hx.label}
                 </button>
               ))}
             </div>
