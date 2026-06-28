@@ -1,5 +1,5 @@
 // RoadWatch Ghana — App Shell Service Worker
-const CACHE = "roadwatch-v2";
+const CACHE = "roadwatch-v3";
 const SHELL = ["/manifest.json"];
 
 self.addEventListener("install", e => {

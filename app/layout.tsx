@@ -39,7 +39,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-              navigator.serviceWorker.register('/sw.js').catch(() => {});
+              navigator.serviceWorker.register('/sw.js').then(reg => {
+                // When a new SW takes over an existing one, reload so users always
+                // see the latest version. prevController being non-null means this
+                // is an update (not a first install), preventing an infinite reload loop.
+                var prevController = navigator.serviceWorker.controller;
+                navigator.serviceWorker.addEventListener('controllerchange', function() {
+                  if (prevController) window.location.reload();
+                  prevController = navigator.serviceWorker.controller;
+                });
+                // Poll for updates every 60s so long-open tabs stay current.
+                setInterval(function() { reg.update(); }, 60000);
+              }).catch(function() {});
             });
           }
         `}}/>
