@@ -34,7 +34,7 @@ const SEVS = [
   { key:"CRITICAL", emoji:"🔴", label:"Critical",  desc:"Road may be fully blocked"            },
 ];
 
-const SC: Record<string,string> = { CRITICAL:"#EF4444", HIGH:"#F97316", MEDIUM:"#F59E0B", LOW:"#22C55E" };
+const SC: Record<string,string> = { CRITICAL:"#EF4444", HIGH:"#ccc", MEDIUM:"#777", LOW:"#444" };
 const SO: Record<string,number> = { CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 };
 
 const SEV_LABEL: Record<string,string> = { LOW:"Minor", MEDIUM:"Moderate", HIGH:"Dangerous", CRITICAL:"Critical" };
@@ -460,10 +460,10 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
   return (
     <div style={{
       background:"#0D0D0D",
-      border:`1px solid ${isNew?"rgba(239,68,68,0.35)":color+"18"}`,
+      border:`1px solid ${isNew?"rgba(239,68,68,0.3)":"#141414"}`,
       borderRadius:16, overflow:"hidden", marginBottom:12,
       animation: isNew ? "newReport .35s ease" : "fadeUp .2s ease",
-      boxShadow: isNew ? `0 0 24px ${color}18` : "none",
+      boxShadow: isNew ? "0 0 20px rgba(239,68,68,0.12)" : "none",
     }}>
       <div style={{position:"relative" as const, height: r.photoUrl ? 190 : 88, overflow:"hidden"}}>
         {r.photoUrl ? (
@@ -472,12 +472,12 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
             <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(to top, rgba(8,8,8,0.96) 0%, rgba(8,8,8,0.3) 55%, transparent 100%)"}}/>
           </>
         ) : (
-          <div style={{width:"100%",height:"100%",background:`linear-gradient(135deg, ${color}14 0%, ${color}06 100%)`,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:`1px solid ${color}18`}}>
-            <span style={{fontSize:40, opacity:.5}}>{h.e}</span>
+          <div style={{width:"100%",height:"100%",background:"#0D0D0D",display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #141414"}}>
+            <span style={{fontSize:40, opacity:.25}}>{h.e}</span>
           </div>
         )}
         <div style={{position:"absolute" as const,top:10,right:10}}>
-          <span style={{color:color,fontSize:9,fontWeight:900,background:"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${color}40`,borderRadius:20,padding:"4px 10px",letterSpacing:.8}}>
+          <span style={{color:r.severity==="CRITICAL"?"#EF4444":"#aaa",fontSize:9,fontWeight:700,background:"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"4px 10px",letterSpacing:.8}}>
             {SEV_LABEL[r.severity]||r.severity}
           </span>
         </div>
@@ -500,18 +500,18 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
       <div style={{padding:"12px 14px"}}>
         {!r.photoUrl&&(
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-            <div style={{width:44,height:44,borderRadius:12,background:`${color}14`,border:`1px solid ${color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+            <div style={{width:44,height:44,borderRadius:12,background:"#141414",border:"1px solid #1e1e1e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
               {h.e}
             </div>
             <div>
               <div style={{color:"#fff",fontWeight:700,fontSize:15}}>{h.label}</div>
-              <div style={{color:"#666",fontSize:12,marginTop:2}}>📍 {r.address}</div>
+              <div style={{color:"#555",fontSize:12,marginTop:2}}>📍 {r.address}</div>
             </div>
           </div>
         )}
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
-          <div style={{background:`${color}10`,border:`1px solid ${color}22`,borderRadius:6,padding:"2px 7px",flexShrink:0}}>
-            <span style={{color:color,fontSize:9,fontWeight:800,letterSpacing:.5}}>{ST_LABEL[r.status]||r.status}</span>
+          <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:6,padding:"2px 7px",flexShrink:0}}>
+            <span style={{color:r.status==="VERIFIED"?"#fff":"#555",fontSize:9,fontWeight:700,letterSpacing:.5}}>{ST_LABEL[r.status]||r.status}</span>
           </div>
           <span style={{color:"#2a2a2a",fontSize:10}}>·</span>
           <span style={{color:"#555",fontSize:11}}>{ago(r.createdAt)}</span>
@@ -524,7 +524,7 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
             style={{flex:1,background:confirmed?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${confirmed?"rgba(34,197,94,0.28)":"rgba(255,255,255,0.06)"}`,borderRadius:10,padding:"12px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s"}}>
             {confirmed?<><span style={{fontSize:14}}>✓</span> Confirmed · {r.upvoteCount||0}</>:<><span style={{fontSize:14}}>👍</span> I see this · {r.upvoteCount||0}</>}
           </button>
-          <button onClick={()=>shareWhatsApp(r)} style={{background:"rgba(37,211,102,0.06)",border:"1px solid rgba(37,211,102,0.15)",borderRadius:10,padding:"12px 14px",color:"#25D366",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Share on WhatsApp">
+          <button onClick={()=>shareWhatsApp(r)} style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:10,padding:"12px 14px",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Share on WhatsApp">
             📤
           </button>
         </div>
@@ -1025,20 +1025,20 @@ export default function PublicPage() {
             {/* Auth */}
             {user ? (
               <button onClick={()=>signOut().then(()=>setUser(null))}
-                style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#888",fontSize:10,fontWeight:700,fontFamily:"inherit",letterSpacing:.5}}>
-                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · Sign out
+                style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#666",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
+                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
               </button>
             ) : (
               <button onClick={()=>setShowAuth(true)}
-                style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:20,padding:"5px 11px",color:"#60A5FA",fontSize:10,fontWeight:800,letterSpacing:.5,fontFamily:"inherit"}}>
+                style={{background:"#111",border:"1px solid #222",borderRadius:20,padding:"5px 11px",color:"#888",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
                 Sign in
               </button>
             )}
 
             {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#555",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>DEMO</span>}
-            <div style={{background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
-              <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 6px #22C55E"}}/>
-              <span style={{color:"#22C55E",fontSize:9,fontWeight:900,letterSpacing:1.5}}>LIVE</span>
+            <div style={{background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
+              <span style={{width:5,height:5,borderRadius:"50%",background:"#22C55E",display:"inline-block",boxShadow:"0 0 5px #22C55E"}}/>
+              <span style={{color:"#555",fontSize:9,fontWeight:700,letterSpacing:1.5}}>LIVE</span>
             </div>
           </div>
         </div>
@@ -1046,14 +1046,14 @@ export default function PublicPage() {
         {/* Stats strip */}
         <div style={{display:"flex",gap:0,borderRadius:10,overflow:"hidden",border:"1px solid #1a1a1a"}}>
           {[
-            { value:activeReports.length, label:"Active",    color:"#EF4444" },
-            { value:criticalCount,         label:"Critical",  color:"#F97316" },
-            { value:totalConfirmed,        label:"Confirmed", color:"#A78BFA" },
-            { value:fixedReports.length,   label:"Fixed",     color:"#22C55E" },
+            { value:activeReports.length, label:"Active",    color:"#fff"     },
+            { value:criticalCount,         label:"Critical",  color:criticalCount>0?"#EF4444":"#fff" },
+            { value:totalConfirmed,        label:"Confirmed", color:"#fff"     },
+            { value:fixedReports.length,   label:"Fixed",     color:"#fff"     },
           ].map((s,i)=>(
             <div key={s.label} style={{flex:1,background:"#0D0D0D",padding:"7px 0",textAlign:"center" as const,borderLeft:i?`1px solid #1a1a1a`:"none"}}>
               <div style={{color:s.color,fontSize:16,fontWeight:900,lineHeight:1}}>{s.value}</div>
-              <div style={{color:"#444",fontSize:9,fontWeight:700,letterSpacing:.5,marginTop:2}}>{s.label}</div>
+              <div style={{color:"#333",fontSize:9,fontWeight:700,letterSpacing:.5,marginTop:2}}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -1085,19 +1085,18 @@ export default function PublicPage() {
             {visibleAnnouncements.length>0&&(
               <div style={{marginBottom:14}}>
                 {visibleAnnouncements.map(a=>{
-                  const at=A_TYPE[a.type]||A_TYPE.INFO;
+                  const isEmergency = a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
                   return(
-                    <div key={a.id} style={{background:at.bg,border:`1px solid ${at.border}`,borderLeft:`3px solid ${at.color}`,borderRadius:12,padding:"11px 13px",marginBottom:6,display:"flex",alignItems:"flex-start",gap:8}}>
+                    <div key={a.id} style={{background:"#0D0D0D",border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":"#1a1a1a"}`,borderLeft:`2px solid ${isEmergency?"#EF4444":"#2a2a2a"}`,borderRadius:12,padding:"11px 13px",marginBottom:6,display:"flex",alignItems:"flex-start",gap:8}}>
                       <div style={{flex:1}}>
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                          <span style={{fontSize:12}}>{at.icon}</span>
-                          <span style={{color:at.color,fontSize:9,fontWeight:800,letterSpacing:1}}>{a.region||"NATIONAL"}</span>
+                          <span style={{color:"#444",fontSize:9,fontWeight:700,letterSpacing:1}}>{a.region||"NATIONAL"}</span>
                         </div>
-                        <div style={{color:"#fff",fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
-                        <div style={{color:"#888",fontSize:11,lineHeight:1.5}}>{a.body}</div>
+                        <div style={{color:"#e0e0e0",fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
+                        <div style={{color:"#555",fontSize:11,lineHeight:1.5}}>{a.body}</div>
                       </div>
                       <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))}
-                        style={{background:"none",border:"none",color:"#555",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                        style={{background:"none",border:"none",color:"#333",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
                     </div>
                   );
                 })}
@@ -1108,7 +1107,7 @@ export default function PublicPage() {
             {user && myReports.length > 0 && (
               <div style={{marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                  <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#60A5FA"}}>MY REPORTS · {myReports.length}</div>
+                  <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"#444"}}>MY REPORTS · {myReports.length}</div>
                 </div>
                 {myReports.slice(0,3).map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
                 <div style={{height:1,background:"#141414",margin:"16px 0"}}/>
@@ -1118,13 +1117,13 @@ export default function PublicPage() {
             {/* Sign-in nudge for non-users */}
             {!user && (
               <button onClick={()=>setShowAuth(true)}
-                style={{width:"100%",background:"rgba(96,165,250,0.05)",border:"1px solid rgba(96,165,250,0.12)",borderRadius:12,padding:"11px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,textAlign:"left" as const}}>
-                <span style={{fontSize:16}}>🔐</span>
+                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"11px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,textAlign:"left" as const}}>
+                <span style={{fontSize:16,opacity:.5}}>🔐</span>
                 <div style={{flex:1}}>
-                  <div style={{color:"#60A5FA",fontWeight:700,fontSize:13}}>Sign in to track your reports</div>
+                  <div style={{color:"#888",fontWeight:600,fontSize:13}}>Sign in to track your reports</div>
                   <div style={{color:"#444",fontSize:11,marginTop:1}}>See your submissions · Get hazard alerts</div>
                 </div>
-                <span style={{color:"#555",fontSize:14}}>›</span>
+                <span style={{color:"#333",fontSize:14}}>›</span>
               </button>
             )}
 
@@ -1141,7 +1140,7 @@ export default function PublicPage() {
             <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4,marginBottom:16}}>
               {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
                 <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(239,68,68,0.12)":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"rgba(239,68,68,0.35)":"#1a1a1a"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#EF4444":"#666",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
+                  style={{flexShrink:0,background:hazardFilter===hx.key?"#fff":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"#fff":"#1e1e1e"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#000":"#555",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
                   {hx.e} {hx.label}
                 </button>
               ))}
@@ -1304,7 +1303,7 @@ export default function PublicPage() {
           <div style={{position:"absolute" as const,bottom:10,left:12,right:0,zIndex:10,display:"flex",gap:5,overflowX:"auto" as const,paddingRight:12}}>
             {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
               <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(239,68,68,0.9)":"rgba(5,5,5,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${hazardFilter===hx.key?"#EF4444":"rgba(255,255,255,0.08)"}`,borderRadius:20,padding:"5px 11px",color:hazardFilter===hx.key?"#fff":"#aaa",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+                style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(255,255,255,0.95)":"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${hazardFilter===hx.key?"rgba(255,255,255,0.9)":"rgba(255,255,255,0.06)"}`,borderRadius:20,padding:"5px 11px",color:hazardFilter===hx.key?"#000":"#777",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
                 {hx.e} {hx.label}
               </button>
             ))}

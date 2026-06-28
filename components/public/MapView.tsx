@@ -6,9 +6,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 const SC: Record<string, string> = {
   CRITICAL: "#EF4444",
-  HIGH:     "#F97316",
-  MEDIUM:   "#F59E0B",
-  LOW:      "#22C55E",
+  HIGH:     "#cccccc",
+  MEDIUM:   "#888888",
+  LOW:      "#555555",
 };
 
 const EMOJI: Record<string, string> = {
@@ -54,7 +54,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
-      style:              "https://tiles.openfreemap.org/styles/liberty",
+      style:              "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center:             [-0.187, 5.604],
       zoom:               11,
       attributionControl: false,
@@ -123,11 +123,11 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         source: "hazards",
         filter: ["has", "point_count"],
         paint:  {
-          "circle-color":         "#EF4444",
+          "circle-color":         "#1a1a1a",
           "circle-radius":        ["step", ["get", "point_count"], 18, 5, 24, 15, 30],
-          "circle-stroke-width":  3,
-          "circle-stroke-color":  "rgba(239,68,68,0.25)",
-          "circle-opacity":       0.92,
+          "circle-stroke-width":  1.5,
+          "circle-stroke-color":  "rgba(255,255,255,0.2)",
+          "circle-opacity":       0.95,
         },
       });
 
@@ -139,12 +139,12 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         filter: ["has", "point_count"],
         layout: {
           "text-field": "{point_count_abbreviated}",
-          "text-size":  13,
+          "text-size":  12,
         },
-        paint: { "text-color": "#fff" },
+        paint: { "text-color": "#aaa" },
       });
 
-      // Individual points — colored by severity
+      // Individual points — red for critical, grey scale for rest
       map.addLayer({
         id:     "unclustered-point",
         type:   "circle",
@@ -154,14 +154,14 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
           "circle-color": [
             "match", ["get", "severity"],
             "CRITICAL", "#EF4444",
-            "HIGH",     "#F97316",
-            "MEDIUM",   "#F59E0B",
-            "LOW",      "#22C55E",
-            "#F59E0B",
+            "HIGH",     "#cccccc",
+            "MEDIUM",   "#888888",
+            "LOW",      "#555555",
+            "#888888",
           ],
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 7, 14, 12],
-          "circle-stroke-width": 2.5,
-          "circle-stroke-color": "rgba(255,255,255,0.4)",
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 6, 14, 11],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "rgba(0,0,0,0.5)",
           "circle-opacity": 0.95,
         },
       });
@@ -285,9 +285,9 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
           <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, color:"#444", marginBottom:10 }}>SEVERITY</div>
           {[
             { label:"Critical",  color:"#EF4444" },
-            { label:"Dangerous", color:"#F97316" },
-            { label:"Moderate",  color:"#F59E0B" },
-            { label:"Minor",     color:"#22C55E" },
+            { label:"Dangerous", color:"#cccccc" },
+            { label:"Moderate",  color:"#888888" },
+            { label:"Minor",     color:"#555555" },
           ].map(({ label, color }) => (
             <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
               <div style={{ width:11, height:11, borderRadius:"50%", background:color, flexShrink:0, boxShadow:`0 0 6px ${color}66` }}/>
@@ -295,7 +295,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
             </div>
           ))}
           <div style={{ borderTop:"1px solid #1e1e1e", marginTop:6, paddingTop:8, display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:22, height:22, borderRadius:"50%", background:"rgba(239,68,68,0.88)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <div style={{ width:22, height:22, borderRadius:"50%", background:"#1a1a1a", border:"1px solid #333", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
               <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>3</span>
             </div>
             <span style={{ color:"#888", fontSize:11 }}>Cluster — tap to expand</span>
