@@ -133,6 +133,14 @@ function Toast({ msg, onDismiss }: { msg: string; onDismiss: () => void }) {
   );
 }
 
+// ─── OFFLINE QUEUE ────────────────────────────────────────────────────────────
+const QUEUE_KEY = "rw_offline_queue";
+const getQueue  = (): any[] => {
+  if (typeof window==="undefined") return [];
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]"); } catch { return []; }
+};
+const saveQueue = (q: any[]) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+
 // ─── VOICE BUTTON ─────────────────────────────────────────────────────────────
 function VoiceButton({ onResult, tip }: { onResult:(r:any)=>void; tip:string }) {
   const [state,  setState]  = useState<"idle"|"recording"|"processing"|"denied">("idle");
@@ -242,19 +250,31 @@ function ReportForm({ gps, onDone, lang }: { gps:any; onDone:(r:any)=>void; lang
   const submit = async () => {
     setSubmitting(true);
     const payload = {
-      latitude:  gps?.lat    || 5.6037,
-      longitude: gps?.lng    || -0.1870,
-      address:   gps?.address || "Accra",
+      latitude:   gps?.lat     || 5.6037,
+      longitude:  gps?.lng     || -0.1870,
+      address:    gps?.address || "Accra",
       hazardType: form.hazardType,
       severity:   form.severity || "MEDIUM",
       photoUrl:   form.photoUrl || null,
     };
+    const fallback = { id:`local-${Date.now()}`, createdAt:new Date().toISOString(), status:"PENDING", upvoteCount:1, ...payload };
+
+    // Offline — queue and return immediately
+    if (!navigator.onLine) {
+      const q = getQueue(); q.push(payload); saveQueue(q);
+      onDone({ ...fallback, _queued:true }); return;
+    }
+
     try {
       const res  = await fetch("/api/reports",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json = await res.json();
       if (json.success) { onDone(json.data); return; }
-    } catch {}
-    onDone({id:`local-${Date.now()}`,createdAt:new Date().toISOString(),status:"PENDING",upvoteCount:1,...payload});
+    } catch {
+      // Network failed mid-flight — queue for retry
+      const q = getQueue(); q.push(payload); saveQueue(q);
+      onDone({ ...fallback, _queued:true }); return;
+    }
+    onDone(fallback);
   };
 
   const h   = hMeta(form.hazardType);
@@ -543,6 +563,49 @@ function ReportCard({ r, confirmed, onConfirm, isNew }: { r:any; confirmed:boole
   );
 }
 
+// ─── SUCCESS SCREEN ───────────────────────────────────────────────────────────
+function SuccessScreen({ r, onClose }: { r: any; onClose: () => void }) {
+  const h       = hMeta(r.hazardType);
+  const queued  = !!r._queued;
+  const hasPhoto= !!r.photoUrl;
+
+  return (
+    <div role="alert" aria-live="assertive"
+      style={{display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",height:"100%",padding:"32px 24px",textAlign:"center" as const,background:"#0A0A0A",animation:"fadeUp .3s ease"}}>
+
+      <div style={{width:80,height:80,borderRadius:"50%",background:queued?"rgba(245,158,11,0.1)":"rgba(34,197,94,0.1)",border:`2px solid ${queued?"#F59E0B":"#22C55E"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,marginBottom:20,animation:"successPop .4s cubic-bezier(.175,.885,.32,1.275)"}}>
+        {queued ? "⏳" : "✅"}
+      </div>
+
+      <div style={{color:"#fff",fontWeight:900,fontSize:22,marginBottom:8,letterSpacing:-.5}}>
+        {queued ? "Saved for later" : "Report submitted!"}
+      </div>
+      <div style={{color:"#666",fontSize:14,lineHeight:1.6,marginBottom:6,maxWidth:280}}>
+        {queued
+          ? "You're offline. Your report will be sent automatically when you reconnect."
+          : hasPhoto
+          ? "Your photo makes it live on the map instantly."
+          : "Under admin review — goes live once verified."
+        }
+      </div>
+
+      <div style={{fontSize:40,margin:"20px 0 8px"}}>{h.e}</div>
+      <div style={{color:"#555",fontSize:13,marginBottom:32}}>{h.label} · {r.address||"Accra, Ghana"}</div>
+
+      {!queued&&(
+        <button onClick={()=>shareWhatsApp(r)} aria-label="Share this report on WhatsApp"
+          style={{width:"100%",background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.25)",borderRadius:14,padding:"15px",color:"#25D366",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+          📤 Share on WhatsApp
+        </button>
+      )}
+      <button onClick={onClose} aria-label="Close and return to feed"
+        style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"15px",color:"#888",fontWeight:700,fontSize:15,fontFamily:"inherit"}}>
+        Done
+      </button>
+    </div>
+  );
+}
+
 // ─── PUBLIC PAGE ──────────────────────────────────────────────────────────────
 export default function PublicPage() {
   const [reports,       setReports]       = useState<any[]>(DEMO_REPORTS);
@@ -566,23 +629,61 @@ export default function PublicPage() {
   const [toast,         setToast]         = useState<string|null>(null);
   const [newReportIds,  setNewReportIds]  = useState<Set<string>>(new Set());
   const [watching,      setWatching]      = useState(0);
+  const [submitted,     setSubmitted]     = useState<any>(null);
+  const [isOnline,      setIsOnline]      = useState(true);
+  const [queueCount,    setQueueCount]    = useState(0);
+  const [flushing,      setFlushing]      = useState(false);
+  const fabRef   = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const dismissToast = useCallback(() => setToast(null), []);
 
   useEffect(()=>{
     setWatching(Math.floor(Math.random()*18)+14);
+    setIsOnline(navigator.onLine);
+    setQueueCount(getQueue().length);
 
     fetch("/api/reports").then(r=>r.json()).then(j=>{
       if(j.success&&j.data.length>0){setReports(j.data);setIsDemo(false);}
     }).catch(()=>{}).finally(()=>setLoading(false));
 
-    // Reveal skeletons for at least 1.2s even in demo mode
     const t = setTimeout(()=>setLoading(false), 1200);
 
     fetch("/api/announcements").then(r=>r.json()).then(j=>{if(j.success)setAnnouncements(j.data);});
+
     const handler=(e:any)=>{e.preventDefault();setInstallPrompt(e);setShowInstall(true);};
     window.addEventListener("beforeinstallprompt",handler);
-    return ()=>{ window.removeEventListener("beforeinstallprompt",handler); clearTimeout(t); };
+
+    // Online / offline
+    const goOnline = async () => {
+      setIsOnline(true);
+      const q = getQueue();
+      if (q.length===0) return;
+      setFlushing(true);
+      const remaining: any[] = [];
+      for (const payload of q) {
+        try {
+          const res  = await fetch("/api/reports",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+          const json = await res.json();
+          if (json.success) setReports(p=>[json.data,...p]); else remaining.push(payload);
+        } catch { remaining.push(payload); }
+      }
+      saveQueue(remaining);
+      setQueueCount(remaining.length);
+      setFlushing(false);
+      const sent = q.length - remaining.length;
+      if (sent>0) setToast(`✅ ${sent} queued report${sent!==1?"s":""} submitted`);
+    };
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online",  goOnline);
+    window.addEventListener("offline", goOffline);
+
+    return ()=>{
+      window.removeEventListener("beforeinstallprompt",handler);
+      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("offline", goOffline);
+      clearTimeout(t);
+    };
   },[]);
 
   // Fake live update: new report drops in after ~28s to demo the live feel
@@ -624,8 +725,27 @@ export default function PublicPage() {
     );
   };
 
+  // Focus management for modal
+  useEffect(()=>{
+    if (!reporting) { fabRef.current?.focus(); return; }
+    const id = requestAnimationFrame(()=>{
+      modalRef.current?.querySelector<HTMLElement>("button:not([disabled]),input")?.focus();
+    });
+    return ()=>cancelAnimationFrame(id);
+  },[reporting]);
+
+  // Escape closes modal
+  useEffect(()=>{
+    const handler=(e:KeyboardEvent)=>{ if(e.key==="Escape"&&reporting){ setReporting(false); setSubmitted(null); } };
+    document.addEventListener("keydown",handler);
+    return ()=>document.removeEventListener("keydown",handler);
+  },[reporting]);
+
   const onReport=()=>{ if(gps.status==="idle") getGps(); setReporting(true); };
-  const onSubmit=(r:any)=>{ if(r) setReports(p=>[r,...p]); setReporting(false); };
+  const onSubmit=(r:any)=>{
+    if(r){ setReports(p=>[r,...p]); setSubmitted(r); setQueueCount(getQueue().length); }
+    else { setReporting(false); }
+  };
 
   const doConfirm=async(id:string)=>{
     if(confirmed[id]) return;
@@ -661,8 +781,9 @@ export default function PublicPage() {
   const NavBtn=({tKey,label}:{tKey:string;label:string})=>{
     const active = tab===tKey;
     return(
-      <button onClick={()=>setTab(tKey)} style={{flex:1,background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",gap:4,fontFamily:"inherit",padding:"10px 0 0",position:"relative" as const}}>
-        {active&&<span style={{position:"absolute" as const,top:0,left:"20%",right:"20%",height:2,background:"#EF4444",borderRadius:"0 0 2px 2px"}}/>}
+      <button onClick={()=>setTab(tKey)} aria-label={label} aria-current={active?"page":undefined}
+        style={{flex:1,background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",gap:4,fontFamily:"inherit",padding:"10px 0 0",position:"relative" as const}}>
+        {active&&<span style={{position:"absolute" as const,top:0,left:"20%",right:"20%",height:2,background:"#EF4444",borderRadius:"0 0 2px 2px"}} aria-hidden="true"/>}
         <span style={{fontSize:11,fontWeight:active?800:600,letterSpacing:.5,color:active?"#fff":"#555",marginTop:2}}>{label}</span>
       </button>
     );
@@ -677,13 +798,29 @@ export default function PublicPage() {
         @keyframes spin      {to{transform:rotate(360deg)}}
         @keyframes fabPulse  {0%,100%{box-shadow:0 4px 24px rgba(239,68,68,0.45),0 0 0 0 rgba(239,68,68,0)}65%{box-shadow:0 4px 24px rgba(239,68,68,0.45),0 0 0 10px rgba(239,68,68,0)}}
         @keyframes recordPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
-        @keyframes newReport {0%{opacity:0;transform:translateY(-6px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
-        @keyframes shimmer   {0%{background-position:200% 0}100%{background-position:-200% 0}}
+        @keyframes newReport  {0%{opacity:0;transform:translateY(-6px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes shimmer    {0%{background-position:200% 0}100%{background-position:-200% 0}}
+        @keyframes successPop {0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
         *{box-sizing:border-box;margin:0;padding:0}
         button{cursor:pointer;-webkit-tap-highlight-color:transparent}
         input::placeholder{color:#333}
         ::-webkit-scrollbar{display:none}
       `}</style>
+
+      {/* ── OFFLINE / QUEUE BANNER ── */}
+      {!isOnline&&(
+        <div role="alert" style={{position:"fixed" as const,top:0,left:0,right:0,zIndex:400,background:"rgba(20,10,0,0.97)",borderBottom:"1px solid rgba(245,158,11,0.3)",padding:"8px 16px",display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>📡</span>
+          <span style={{color:"#F59E0B",fontSize:12,fontWeight:600}}>You're offline — reports are queued and will submit when you reconnect</span>
+          {queueCount>0&&<span style={{marginLeft:"auto",color:"#F59E0B",fontSize:11,fontWeight:700}}>{queueCount} queued</span>}
+        </div>
+      )}
+      {isOnline&&flushing&&(
+        <div role="status" style={{position:"fixed" as const,top:0,left:0,right:0,zIndex:400,background:"rgba(0,20,10,0.97)",borderBottom:"1px solid rgba(34,197,94,0.3)",padding:"8px 16px",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:12,height:12,border:"2px solid #22C55E44",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+          <span style={{color:"#22C55E",fontSize:12,fontWeight:600}}>Submitting {queueCount} queued report{queueCount!==1?"s":""}…</span>
+        </div>
+      )}
 
       {/* ── TOAST ── */}
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
@@ -948,37 +1085,53 @@ export default function PublicPage() {
 
       {/* ── REPORT MODAL ── */}
       {reporting&&(
-        <div style={{position:"fixed" as const,inset:0,zIndex:200}}>
-          <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)"}} onClick={()=>setReporting(false)}/>
-          <div style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0A0A0A",borderRadius:"20px 20px 0 0",border:"1px solid #1a1a1a",borderBottom:"none",height:"88vh",display:"flex",flexDirection:"column" as const,animation:"slideUp .26s cubic-bezier(.32,.72,0,1)"}}>
-            <div style={{flexShrink:0}}>
-              <div style={{display:"flex",justifyContent:"center",paddingTop:9,paddingBottom:2}}>
-                <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}}/>
-              </div>
-              <div style={{padding:"10px 14px 12px",borderBottom:"1px solid #111",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,#EF4444,#7F1D1D)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>🚧</div>
-                <div style={{flex:1}}>
-                  <div style={{color:"#fff",fontWeight:700,fontSize:14}}>Report a Hazard</div>
-                  <div style={{fontSize:10,display:"flex",alignItems:"center",gap:4,marginTop:1}}>
-                    {gps.status==="locating"
-                      ?<><div style={{width:7,height:7,border:"1.5px solid #333",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}}/><span style={{color:"#555"}}>Getting location…</span></>
-                      :gps.status==="live"
-                      ?<><span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/><span style={{color:"#4ade80"}}>GPS locked · {gps.address}</span></>
-                      :<><span style={{width:4,height:4,borderRadius:"50%",background:"#555",display:"inline-block"}}/><span style={{color:"#555"}}>Location ready</span></>
-                    }
+        <div style={{position:"fixed" as const,inset:0,zIndex:200}} role="dialog" aria-modal="true" aria-label="Report a road hazard">
+          <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)"}}
+            onClick={()=>{ if(!submitted){ setReporting(false); } }} aria-hidden="true"/>
+          <div ref={modalRef} style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0A0A0A",borderRadius:"20px 20px 0 0",border:"1px solid #1a1a1a",borderBottom:"none",height:"88vh",display:"flex",flexDirection:"column" as const,animation:"slideUp .26s cubic-bezier(.32,.72,0,1)"}}
+            onKeyDown={(e)=>{
+              if(e.key==="Tab"){
+                const els=modalRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]),input,[tabindex]:not([tabindex='-1'])");
+                if(!els||els.length===0) return;
+                const first=els[0], last=els[els.length-1];
+                if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+                else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+              }
+            }}>
+            {submitted ? (
+              <SuccessScreen r={submitted} onClose={()=>{ setSubmitted(null); setReporting(false); }}/>
+            ) : (
+              <>
+                <div style={{flexShrink:0}}>
+                  <div style={{display:"flex",justifyContent:"center",paddingTop:9,paddingBottom:2}}>
+                    <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}} aria-hidden="true"/>
+                  </div>
+                  <div style={{padding:"10px 14px 12px",borderBottom:"1px solid #111",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,#EF4444,#7F1D1D)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}} aria-hidden="true">🚧</div>
+                    <div style={{flex:1}}>
+                      <div style={{color:"#fff",fontWeight:700,fontSize:14}}>Report a Hazard</div>
+                      <div style={{fontSize:10,display:"flex",alignItems:"center",gap:4,marginTop:1}} aria-live="polite">
+                        {gps.status==="locating"
+                          ?<><div style={{width:7,height:7,border:"1.5px solid #333",borderTopColor:"#22C55E",borderRadius:"50%",animation:"spin .8s linear infinite"}} aria-hidden="true"/><span style={{color:"#555"}}>Getting location…</span></>
+                          :gps.status==="live"
+                          ?<><span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}} aria-hidden="true"/><span style={{color:"#4ade80"}}>GPS locked · {gps.address}</span></>
+                          :<><span style={{width:4,height:4,borderRadius:"50%",background:"#555",display:"inline-block"}} aria-hidden="true"/><span style={{color:"#555"}}>Location ready</span></>
+                        }
+                      </div>
+                    </div>
+                    <button onClick={()=>setLang(l=>l==="EN"?"TW":"EN")} aria-label={`Switch language to ${lang==="EN"?"Twi":"English"}`}
+                      style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"5px 9px",color:"#666",fontSize:9,fontWeight:900,letterSpacing:.5,fontFamily:"inherit"}}>
+                      {lang==="EN"?"TW 🇬🇭":"EN 🇬🇧"}
+                    </button>
+                    <button onClick={()=>setReporting(false)} aria-label="Close report form"
+                      style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:18,lineHeight:1}}>×</button>
                   </div>
                 </div>
-                <button onClick={()=>setLang(l=>l==="EN"?"TW":"EN")}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"5px 9px",color:"#666",fontSize:9,fontWeight:900,letterSpacing:.5,fontFamily:"inherit"}}>
-                  {lang==="EN"?"TW 🇬🇭":"EN 🇬🇧"}
-                </button>
-                <button onClick={()=>setReporting(false)}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:18,lineHeight:1}}>×</button>
-              </div>
-            </div>
-            <div style={{flex:1,overflow:"hidden"}}>
-              <ReportForm gps={gps} onDone={onSubmit} lang={lang}/>
-            </div>
+                <div style={{flex:1,overflow:"hidden"}}>
+                  <ReportForm gps={gps} onDone={onSubmit} lang={lang}/>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -989,7 +1142,7 @@ export default function PublicPage() {
           <NavBtn tKey="map"  label="Map"/>
           <div style={{flex:1,display:"flex",justifyContent:"center",alignItems:"flex-end"}}>
             <div style={{position:"relative" as const,bottom:14}}>
-              <button onClick={onReport} style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"fabPulse 5s ease-in-out infinite"}}>
+              <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard" style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"fabPulse 5s ease-in-out infinite"}}>
                 🚨
               </button>
               <div style={{textAlign:"center" as const,marginTop:4,fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444",lineHeight:1}}>REPORT</div>

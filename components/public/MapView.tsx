@@ -41,10 +41,17 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
   const [ready,       setReady]       = useState(false);
   const [markerCount, setMarkerCount] = useState(0);
   const [selected,    setSelected]    = useState<any | null>(null);
+  const [webGLOk,     setWebGLOk]     = useState(true);
+  const [mapError,    setMapError]     = useState(false);
 
   // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    // WebGL check — headless browsers and some old devices lack it
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) { setWebGLOk(false); return; }
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
@@ -56,8 +63,11 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("load", () => setReady(true));
+    map.on("load",  () => setReady(true));
     map.on("click", () => setSelected(null));
+    map.on("error", (e: any) => {
+      if (e?.error?.message?.includes("tiles") || e?.error?.status === 0) setMapError(true);
+    });
 
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
@@ -123,10 +133,43 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
     }
   }, [ready, reports, hazardFilter]);
 
+  // Fallback: WebGL unavailable or tiles failed — show hazard list
+  if (!webGLOk || mapError) {
+    const active = reports.filter(r => r.status !== "RESOLVED" && r.status !== "DISMISSED" && (hazardFilter === "All" || r.hazardType === hazardFilter));
+    return (
+      <div style={{ width:"100%", height:"100%", background:"#080808", overflowY:"auto" as const, padding:"16px" }} role="region" aria-label="Hazard list (map unavailable)">
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+          <span style={{ fontSize:18 }}>📋</span>
+          <div>
+            <div style={{ color:"#555", fontSize:11, fontWeight:700 }}>MAP UNAVAILABLE</div>
+            <div style={{ color:"#333", fontSize:10 }}>{!webGLOk ? "WebGL not supported on this device" : "Tiles failed to load — check connection"}</div>
+          </div>
+        </div>
+        <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, color:"#444", marginBottom:10 }}>ACTIVE HAZARDS · {active.length}</div>
+        {active.length===0
+          ? <div style={{ color:"#333", fontSize:13, textAlign:"center" as const, paddingTop:40 }}>No active hazards</div>
+          : active.map(r => {
+              const color = SC[r.severity] || "#F59E0B";
+              return (
+                <div key={r.id} style={{ background:"#0D0D0D", border:`1px solid ${color}22`, borderLeft:`3px solid ${color}`, borderRadius:12, padding:"11px 13px", marginBottom:8, display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:20 }} aria-hidden="true">{EMOJI[r.hazardType]||"⚠️"}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:"#fff", fontSize:13, fontWeight:600 }}>{r.hazardType.replace(/_/g," ")}</div>
+                    <div style={{ color:"#666", fontSize:11, marginTop:2 }}>📍 {r.address}</div>
+                  </div>
+                  <span style={{ color:color, fontSize:9, fontWeight:900, letterSpacing:.5 }}>{SEV_LABEL[r.severity]||r.severity}</span>
+                </div>
+              );
+            })
+        }
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {/* Map canvas */}
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} aria-label="Interactive hazard map of Greater Accra" role="application"/>
 
       {/* Maplibre popup style overrides */}
       <style>{`
