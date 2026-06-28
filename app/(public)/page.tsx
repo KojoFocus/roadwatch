@@ -456,7 +456,7 @@ function ReportCard({ r, confirmed, onConfirm, isNew, distanceKm }: { r:any; con
           <span style={{color:"#666",fontSize:12}}>{h.e} {h.label}</span>
           <span style={{color:"#3a3a3a",fontSize:11,marginLeft:"auto"}}>{ago(r.resolvedAt||r.createdAt)}</span>
         </div>
-        <div style={{color:"#555",fontSize:12,marginBottom:r.resolutionNote?8:0}}>📍 {r.address}</div>
+        <div style={{color:"#555",fontSize:12,marginBottom:r.resolutionNote?8:0}}>{r.address}</div>
         {r.resolutionNote&&(
           <div style={{background:"#111",borderRadius:10,padding:"9px 12px",color:"#555",fontSize:12,lineHeight:1.6,fontStyle:"italic"}}>
             "{r.resolutionNote}"
@@ -502,7 +502,7 @@ function ReportCard({ r, confirmed, onConfirm, isNew, distanceKm }: { r:any; con
             <span style={{fontSize:22,flexShrink:0}}>{h.e}</span>
             <div>
               <div style={{color:"#fff",fontWeight:800,fontSize:15,lineHeight:1,textShadow:"0 1px 6px rgba(0,0,0,0.9)"}}>{h.label}</div>
-              <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:2}}>📍 {r.address}</div>
+              <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:2}}>{r.address}</div>
             </div>
           </div>
         )}
@@ -516,7 +516,7 @@ function ReportCard({ r, confirmed, onConfirm, isNew, distanceKm }: { r:any; con
             </div>
             <div>
               <div style={{color:"#fff",fontWeight:700,fontSize:15}}>{h.label}</div>
-              <div style={{color:"#555",fontSize:12,marginTop:2}}>📍 {r.address}</div>
+              <div style={{color:"#555",fontSize:12,marginTop:2}}>{r.address}</div>
             </div>
           </div>
         )}
@@ -1050,47 +1050,18 @@ export default function PublicPage() {
             <div style={{color:"#333",fontSize:8,fontWeight:700,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
             <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            {/* Push notification bell */}
-            <button onClick={subscribePush} aria-label={pushEnabled?"Notifications on":"Enable notifications"}
-              style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:pushEnabled?"#888":"#333",fontSize:12,fontWeight:700}}>
-              {pushEnabled?"●":"○"}
+          {/* Auth */}
+          {user ? (
+            <button onClick={()=>signOut().then(()=>setUser(null))}
+              style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#666",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
+              {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
             </button>
-
-            {/* Auth */}
-            {user ? (
-              <button onClick={()=>signOut().then(()=>setUser(null))}
-                style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#666",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
-                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
-              </button>
-            ) : (
-              <button onClick={()=>setShowAuth(true)}
-                style={{background:"#111",border:"1px solid #222",borderRadius:20,padding:"5px 11px",color:"#888",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
-                Sign in
-              </button>
-            )}
-
-            {isDemo&&<span style={{fontSize:8,fontWeight:900,letterSpacing:1.5,color:"#555",background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"3px 9px"}}>DEMO</span>}
-            <div style={{background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
-              <span style={{width:4,height:4,borderRadius:"50%",background:"#22C55E",display:"inline-block"}}/>
-              <span style={{color:"#555",fontSize:9,fontWeight:700,letterSpacing:1.5}}>LIVE</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats strip */}
-        <div style={{display:"flex",gap:0,borderRadius:10,overflow:"hidden",border:"1px solid #1a1a1a"}}>
-          {[
-            { value:activeReports.length, label:"Active",    color:"#fff"     },
-            { value:criticalCount,         label:"Critical",  color:criticalCount>0?"#EF4444":"#fff" },
-            { value:totalConfirmed,        label:"Confirmed", color:"#fff"     },
-            { value:fixedReports.length,   label:"Fixed",     color:"#fff"     },
-          ].map((s,i)=>(
-            <div key={s.label} style={{flex:1,background:"#0D0D0D",padding:"7px 0",textAlign:"center" as const,borderLeft:i?`1px solid #1a1a1a`:"none"}}>
-              <div style={{color:s.color,fontSize:16,fontWeight:900,lineHeight:1}}>{s.value}</div>
-              <div style={{color:"#333",fontSize:9,fontWeight:700,letterSpacing:.5,marginTop:2}}>{s.label}</div>
-            </div>
-          ))}
+          ) : (
+            <button onClick={()=>setShowAuth(true)}
+              style={{background:"#111",border:"1px solid #222",borderRadius:20,padding:"5px 11px",color:"#888",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
+              Sign in
+            </button>
+          )}
         </div>
       </div>
 
@@ -1098,27 +1069,22 @@ export default function PublicPage() {
       {tab==="feed"&&(
         <div style={{animation:"fadeUp .18s ease"}}>
 
-          {/* Hero CTA */}
-          <div style={{padding:"18px 18px 14px",borderBottom:"1px solid #111"}}>
+          <div style={{padding:"14px 18px 0"}}>
             {/* Nearest warning banner */}
             {nearestWarning && (
-              <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderLeft:"4px solid #EF4444",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
-                <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#EF4444",marginBottom:5}}>
-                  ⚠ {SEV_LABEL[nearestWarning.severity].toUpperCase()} — NEAREST HAZARD
+              <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderLeft:"3px solid #EF4444",borderRadius:10,padding:"11px 13px",marginBottom:12}}>
+                <div style={{fontSize:9,fontWeight:900,letterSpacing:1.5,color:"#EF4444",marginBottom:4}}>
+                  {SEV_LABEL[nearestWarning.severity].toUpperCase()} — NEAREST HAZARD
                 </div>
-                <div style={{color:"#fff",fontWeight:800,fontSize:16,lineHeight:1.2,marginBottom:3}}>
-                  {hMeta(nearestWarning.hazardType).e} {hMeta(nearestWarning.hazardType).label}
+                <div style={{color:"#e0e0e0",fontWeight:700,fontSize:14,marginBottom:2}}>
+                  {hMeta(nearestWarning.hazardType).label}
                 </div>
-                <div style={{color:"#777",fontSize:12}}>
+                <div style={{color:"#666",fontSize:12}}>
                   {nearestWarning.address}
-                  {nearestWarning._dist!==null&&<span style={{color:"#bbb",fontWeight:700}}> · {fmtDist(nearestWarning._dist)}</span>}
+                  {nearestWarning._dist!==null&&<span style={{color:"#999",fontWeight:600}}> · {fmtDist(nearestWarning._dist)}</span>}
                 </div>
               </div>
             )}
-            <div style={{color:"#444",fontSize:11,textAlign:"center" as const}}>Tap + below to report a hazard · Takes 30 seconds</div>
-          </div>
-
-          <div style={{padding:"14px 18px 0"}}>
 
             {/* Announcements */}
             {visibleAnnouncements.length>0&&(
@@ -1153,18 +1119,6 @@ export default function PublicPage() {
               </div>
             )}
 
-            {/* Sign-in nudge for non-users */}
-            {!user && (
-              <button onClick={()=>setShowAuth(true)}
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"11px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,textAlign:"left" as const}}>
-                <div style={{flex:1}}>
-                  <div style={{color:"#888",fontWeight:600,fontSize:13}}>Sign in to track your reports</div>
-                  <div style={{color:"#444",fontSize:11,marginTop:1}}>See your submissions · Get hazard alerts</div>
-                </div>
-                <span style={{color:"#333",fontSize:14}}>›</span>
-              </button>
-            )}
-
             {/* Search */}
             <div style={{position:"relative" as const,marginBottom:10}}>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
@@ -1183,12 +1137,8 @@ export default function PublicPage() {
               ))}
             </div>
 
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>CITIZEN REPORTS · {feedReports.length}</div>
-              {watching>0&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span style={{width:4,height:4,borderRadius:"50%",background:"#333",display:"inline-block"}}/>
-                <span style={{color:"#333",fontSize:10}}>{watching} watching</span>
-              </div>}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>{feedReports.length} REPORTS</div>
             </div>
 
             {loading&&[0,1,2].map(i=><SkeletonCard key={i}/>)}
@@ -1210,8 +1160,7 @@ export default function PublicPage() {
                 <div style={{display:"flex",alignItems:"center",gap:10,margin:"28px 0 14px"}}>
                   <div style={{flex:1,height:1,background:"#141414"}}/>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:12}}>✅</span>
-                    <span style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#22C55E"}}>RECENTLY FIXED · {fixedReports.length}</span>
+                    <span style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555"}}>RECENTLY FIXED · {fixedReports.length}</span>
                   </div>
                   <div style={{flex:1,height:1,background:"#141414"}}/>
                 </div>
