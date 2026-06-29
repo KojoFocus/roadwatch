@@ -132,6 +132,52 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
+// ─── HAZARD TYPE ICON ─────────────────────────────────────────────────────────
+function HazardIcon({ k, size=26, color="#666" }: { k:string; size?:number; color?:string }) {
+  const s = { stroke:color, strokeWidth:"1.3", strokeLinecap:"round" as const, strokeLinejoin:"round" as const, fill:"none" };
+  const sv = (ch: React.ReactNode) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none">{ch}</svg>;
+  switch(k) {
+    case "POTHOLE": return sv(<>
+      <ellipse cx="12" cy="15" rx="8" ry="3.5" {...s}/>
+      <ellipse cx="12" cy="15" rx="3.5" ry="1.3" {...s}/>
+      <path d="M8 11.5L6 7M16 11.5l2-4.5" {...s}/>
+    </>);
+    case "FLOOD": return sv(<>
+      <path d="M3 9q3-3 6 0t6 0 6 0" {...s}/>
+      <path d="M3 14q3-3 6 0t6 0 6 0" {...s}/>
+      <path d="M3 19q3-3 6 0t6 0 6 0" {...s}/>
+    </>);
+    case "ACCIDENT": return sv(<>
+      <path d="M2 14h5.5l1.5-4h6l1.5 4H22" {...s}/>
+      <circle cx="7.5" cy="15.5" r="1.5" {...s}/>
+      <circle cx="16.5" cy="15.5" r="1.5" {...s}/>
+      <path d="M18.5 10l2-2M20 12h2M18.5 14l1.5 1.5" {...s}/>
+    </>);
+    case "DEBRIS": return sv(<>
+      <path d="M5 18L9 8l3 5 3-6 4 11H5z" {...s}/>
+      <path d="M3 18h18" {...s}/>
+    </>);
+    case "BROKEN_LIGHT": return sv(<>
+      <rect x="8" y="2" width="8" height="14" rx="2" {...s}/>
+      <circle cx="12" cy="6" r="1.5" fill={color} stroke="none"/>
+      <circle cx="12" cy="10" r="1.5" {...s}/>
+      <circle cx="12" cy="14" r="1.5" {...s}/>
+      <path d="M10 19h4M12 16v3" {...s}/>
+      <path d="M9 3l6 7M15 3L9 10" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+    </>);
+    case "ROAD_BLOCK": return sv(<>
+      <rect x="2" y="10" width="20" height="5" rx="1.5" {...s}/>
+      <path d="M7 10l4 5M13 10l4 5" {...s}/>
+      <path d="M2 15v3M12 15v3M22 15v3" {...s}/>
+    </>);
+    default: return sv(<>
+      <circle cx="12" cy="12" r="9" {...s}/>
+      <path d="M12 8c0-2 3-2 3 0s-3 2.5-3 4" {...s}/>
+      <circle cx="12" cy="17" r="0.8" fill={color} stroke="none"/>
+    </>);
+  }
+}
+
 // ─── SKELETON ITEM ────────────────────────────────────────────────────────────
 function SkeletonItem() {
   return (
@@ -336,7 +382,8 @@ function ReportForm({ gps, onDone, lang, userId }: { gps:any; onDone:(r:any)=>vo
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
               {H.map(hx=>(
                 <button key={hx.key} onClick={()=>pickType(hx)}
-                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"18px 14px",color:"#ccc",fontSize:14,fontWeight:600,fontFamily:"inherit",textAlign:"left" as const,transition:"border-color .15s,background .15s"}}>
+                  style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"18px 10px 16px",color:"#ccc",fontSize:13,fontWeight:600,fontFamily:"inherit",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:10,transition:"border-color .15s,background .15s"}}>
+                  <HazardIcon k={hx.key}/>
                   {hx.label}
                 </button>
               ))}
@@ -520,7 +567,7 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
   const subSize   = sev==="CRITICAL" ? 11 : sev==="HIGH" ? 10.5 : 10;
   const subColor  = sev==="CRITICAL" ? "var(--hs-c)" : sev==="HIGH" ? "var(--hs-h)" : "var(--hs-m)";
 
-  const subtitle = [SEV_LABEL[sev], h.label, distanceKm != null ? fmtDist(distanceKm) : null]
+  const subtitle = [SEV_LABEL[sev], distanceKm != null ? fmtDist(distanceKm) : null, r.address]
     .filter(Boolean).join(" · ");
 
   return (
@@ -546,15 +593,8 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
           {isNew&&<span style={{marginLeft:7,fontSize:8,fontWeight:800,letterSpacing:.8,color:"#EF4444",verticalAlign:"middle"}}>JUST IN</span>}
         </div>
         <div style={{fontSize:subSize,color:subColor,lineHeight:1.45}}>
-          {subtitle}{r.address ? ` · ${r.address}` : ""}
+          {subtitle}
         </div>
-        {sev==="CRITICAL"&&!isFixed&&(
-          <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid var(--hsep)"}}>
-            <div style={{fontSize:10,color:"var(--hblrb)",lineHeight:1.5}}>
-              {h.label} on {r.address||"this road"}{distanceKm!=null ? ` — ${fmtDist(distanceKm)} from you` : ""}.
-            </div>
-          </div>
-        )}
       </div>
       <div style={{paddingTop:5,flexShrink:0,color:"var(--hchev)",fontSize:14,lineHeight:1}}>›</div>
     </button>
