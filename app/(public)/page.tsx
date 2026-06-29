@@ -935,7 +935,9 @@ export default function PublicPage() {
   const [routeFrom,     setRouteFrom]     = useState("");
   const [routeTo,       setRouteTo]       = useState("");
   const [routeResult,   setRouteResult]   = useState<any[]|null>(null);
-  const [routeGeometry, setRouteGeometry] = useState<[number,number][]|null>(null);
+  const [routeGeometry,    setRouteGeometry]    = useState<[number,number][]|null>(null);
+  const [altRouteGeometry, setAltRouteGeometry] = useState<[number,number][]|null>(null);
+  const [loadingAlt,       setLoadingAlt]       = useState(false);
   const [safetyScore,   setSafetyScore]   = useState<number|null>(null);
   const [checking,      setChecking]      = useState(false);
   const [loading,       setLoading]       = useState(true);
@@ -1179,6 +1181,22 @@ export default function PublicPage() {
     setChecking(false);
   };
 
+  const fetchAltRoute = async () => {
+    if (!routeGeometry || routeGeometry.length < 2) return;
+    setLoadingAlt(true); setAltRouteGeometry(null);
+    const from = routeGeometry[0];
+    const to   = routeGeometry[routeGeometry.length - 1];
+    try {
+      const res  = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${from[0]},${from[1]};${to[0]},${to[1]}?geometries=geojson&overview=full&alternatives=true`
+      );
+      const data = await res.json();
+      const alt  = data.routes?.[1] ?? data.routes?.[0];
+      if (alt?.geometry?.coordinates) setAltRouteGeometry(alt.geometry.coordinates);
+    } catch {}
+    setLoadingAlt(false);
+  };
+
   // ── Theme helper ──
   const th = themeName === "light" ? LITE : DARK;
   const onThemeChange = (t: "dark"|"light") => { setThemeName(t); localStorage.setItem("rw_theme", t); };
@@ -1302,15 +1320,17 @@ export default function PublicPage() {
       {tab==="home"&&(
         <div style={{animation:"fadeUp .18s ease",paddingBottom:120}}>
 
-          {/* Critical alert banner */}
+          {/* ── Route Warning Banner ── */}
           {(()=>{
             const crit=(routeResult??feedReports).find((r:any)=>r.severity==="CRITICAL");
             if(!crit) return null;
             const h=hMeta(crit.hazardType);
             const dist=crit._dist!=null?` · ${fmtDist(crit._dist)} ahead`:"";
             return(
-              <div style={{padding:"12px 18px 0"}} onClick={()=>setSheetReport(crit)}>
-                <div style={{background:"rgba(100,20,20,0.55)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:16,padding:"15px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <div style={{padding:"12px 18px 0"}}>
+                {/* Main critical banner */}
+                <div onClick={()=>setSheetReport(crit)}
+                  style={{background:"rgba(100,20,20,0.55)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:altRouteGeometry?"16px 16px 0 0":16,padding:"15px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
                   <svg width="22" height="20" viewBox="0 0 22 20" fill="none" style={{flexShrink:0}}>
                     <path d="M11 1L21 19H1L11 1Z" fill="#F59E0B" stroke="#F59E0B" strokeWidth="0.5" strokeLinejoin="round"/>
                     <line x1="11" y1="8" x2="11" y2="13" stroke="#1a0808" strokeWidth="2" strokeLinecap="round"/>
@@ -1325,13 +1345,32 @@ export default function PublicPage() {
                   </div>
                   <span style={{color:"rgba(255,255,255,0.4)",fontSize:18}}>›</span>
                 </div>
+                {/* Alternative route action strip */}
+                {altRouteGeometry ? (
+                  <div style={{background:"rgba(37,99,235,0.15)",border:"1px solid rgba(59,130,246,0.35)",borderTop:"none",borderRadius:"0 0 16px 16px",padding:"11px 16px",display:"flex",alignItems:"center",gap:10}}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{flexShrink:0}}>
+                      <path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span style={{fontSize:12,color:"#93C5FD",fontWeight:600,flex:1}}>Alternative route shown in blue</span>
+                    <button onClick={()=>setAltRouteGeometry(null)}
+                      style={{background:"none",border:"none",color:"rgba(147,197,253,0.5)",fontSize:18,lineHeight:1,fontFamily:"inherit",cursor:"pointer"}}>×</button>
+                  </div>
+                ) : (
+                  <button onClick={fetchAltRoute} disabled={loadingAlt||!routeGeometry}
+                    style={{width:"100%",background:"rgba(30,58,138,0.4)",border:"1px solid rgba(59,130,246,0.3)",borderTop:"none",borderRadius:"0 0 16px 16px",padding:"11px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit",cursor:"pointer",opacity:loadingAlt?0.6:1}}>
+                    {loadingAlt
+                      ? <><div style={{width:10,height:10,border:"1.5px solid #3B82F6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/><span style={{color:"#93C5FD",fontSize:12,fontWeight:600}}>Finding alternative…</span></>
+                      : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{color:"#3B82F6",fontSize:12,fontWeight:700}}>Show Alternative Route</span></>
+                    }
+                  </button>
+                )}
               </div>
             );
           })()}
 
           {/* Map — edge to edge */}
           <div style={{height:300,margin:"14px 0 0",position:"relative" as const}}>
-            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView routeGeometry={routeGeometry}/>
+            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView routeGeometry={routeGeometry} altRouteGeometry={altRouteGeometry}/>
           </div>
 
           {/* ON YOUR ROUTE section */}

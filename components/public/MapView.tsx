@@ -28,15 +28,16 @@ function timeAgo(iso: string) {
 }
 
 interface Props {
-  reports:       any[];
-  hazardFilter:  string;
-  onConfirm:     (id: string) => void;
-  confirmed:     Record<string, boolean>;
-  lockView?:     boolean;
-  routeGeometry?: [number,number][] | null;
+  reports:          any[];
+  hazardFilter:     string;
+  onConfirm:        (id: string) => void;
+  confirmed:        Record<string, boolean>;
+  lockView?:        boolean;
+  routeGeometry?:   [number,number][] | null;
+  altRouteGeometry?: [number,number][] | null;
 }
 
-export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView, routeGeometry }: Props) {
+export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView, routeGeometry, altRouteGeometry }: Props) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const mapRef         = useRef<maplibregl.Map | null>(null);
   const confirmedMarkers = useRef<maplibregl.Marker[]>([]);
@@ -202,7 +203,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         },
       });
 
-      // Route line
+      // Primary route line (red)
       map.addSource("route", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -213,6 +214,19 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         source: "route",
         layout: { "line-join": "round", "line-cap": "round" },
         paint:  { "line-color": "#EF4444", "line-width": 3, "line-opacity": 0.85 },
+      }, "unclustered-point");
+
+      // Alternative route line (dashed blue)
+      map.addSource("alt-route", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id:     "alt-route-line",
+        type:   "line",
+        source: "alt-route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint:  { "line-color": "#3B82F6", "line-width": 3, "line-opacity": 0.9, "line-dasharray": [2, 2] },
       }, "unclustered-point");
 
       // Click cluster → zoom in to expand
@@ -269,17 +283,14 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
     }
   }, [ready, reports, hazardFilter, lockView]);
 
-  // Draw real OSRM route geometry when it changes
+  // Draw primary route
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const src = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
     if (routeGeometry && routeGeometry.length >= 2) {
-      src.setData({
-        type: "FeatureCollection",
-        features: [{ type: "Feature", geometry: { type: "LineString", coordinates: routeGeometry }, properties: {} }],
-      });
+      src.setData({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "LineString", coordinates: routeGeometry }, properties: {} }] });
       const bounds = new maplibregl.LngLatBounds();
       routeGeometry.forEach(c => bounds.extend(c));
       map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 700 });
@@ -287,6 +298,24 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       src.setData({ type: "FeatureCollection", features: [] });
     }
   }, [ready, routeGeometry]);
+
+  // Draw alternative route (dashed blue) and dim/restore primary
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const altSrc = map.getSource("alt-route") as maplibregl.GeoJSONSource | undefined;
+    if (!altSrc) return;
+    if (altRouteGeometry && altRouteGeometry.length >= 2) {
+      altSrc.setData({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "LineString", coordinates: altRouteGeometry }, properties: {} }] });
+      if (map.getLayer("route-line")) map.setPaintProperty("route-line", "line-opacity", 0.3);
+      const bounds = new maplibregl.LngLatBounds();
+      altRouteGeometry.forEach(c => bounds.extend(c));
+      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 700 });
+    } else {
+      altSrc.setData({ type: "FeatureCollection", features: [] });
+      if (map.getLayer("route-line")) map.setPaintProperty("route-line", "line-opacity", 0.85);
+    }
+  }, [ready, altRouteGeometry]);
 
   // Fallback when WebGL or tiles unavailable
   if (!webGLOk || mapError) {
