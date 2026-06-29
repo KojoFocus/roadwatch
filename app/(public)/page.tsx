@@ -905,6 +905,8 @@ export default function PublicPage() {
   const [sheetReport,   setSheetReport]   = useState<any>(null);
   const [themeName,     setThemeName]     = useState<"dark"|"light">("dark");
   const [showSettings,  setShowSettings]  = useState(false);
+  const [feedExpanded,  setFeedExpanded]  = useState(false);
+  const [pillsExpanded, setPillsExpanded] = useState(false);
   const fabRef   = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -1267,13 +1269,19 @@ export default function PublicPage() {
                 style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:th.t4,fontSize:18,lineHeight:1}}>×</button>}
             </div>
-            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4}}>
-              {[{key:"All",label:"All"},...H].map(hx=>(
-                <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
-                  {hx.label}
-                </button>
-              ))}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap" as const,paddingBottom:4}}>
+              {[{key:"All",label:"All"},...H]
+                .filter((_,i) => pillsExpanded || i < 4)
+                .map(hx=>(
+                  <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
+                    style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
+                    {hx.label}
+                  </button>
+                ))}
+              <button onClick={()=>setPillsExpanded(p=>!p)}
+                style={{flexShrink:0,background:th.pi,border:`1px solid ${th.pib}`,borderRadius:20,padding:"6px 12px",color:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+                {pillsExpanded ? "Less" : "More"}
+              </button>
             </div>
           </div>
 
@@ -1294,9 +1302,17 @@ export default function PublicPage() {
                   Report a Hazard
                 </button>
               </div>
-              :feedReports.map((r:any)=>(
-                <HazardItem key={r.id} r={r} distanceKm={r._dist} isNew={newReportIds.has(r.id)} onTap={()=>setSheetReport(r)}/>
-              ))
+              :<>
+                {(feedExpanded ? feedReports : feedReports.slice(0,4)).map((r:any)=>(
+                  <HazardItem key={r.id} r={r} distanceKm={r._dist} isNew={newReportIds.has(r.id)} onTap={()=>setSheetReport(r)}/>
+                ))}
+                {feedReports.length>4&&(
+                  <button onClick={()=>setFeedExpanded(p=>!p)}
+                    style={{width:"100%",background:"none",border:"none",padding:"12px 0",color:th.t3,fontSize:12,fontWeight:700,fontFamily:"inherit",letterSpacing:.3}}>
+                    {feedExpanded ? "Show less" : `Show ${feedReports.length-4} more`}
+                  </button>
+                )}
+              </>
             )}
 
             {!loading&&fixedReports.length>0&&(
