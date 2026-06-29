@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import dynamic                                       from "next/dynamic";
 import { uploadPhoto }                               from "@/lib/supabase";
 import { supabase, signInWithGoogle, sendPhoneOTP, verifyPhoneOTP, signOut } from "@/lib/supabase-auth";
@@ -72,6 +72,31 @@ const FORM_STR = {
 } as const;
 type Lang = keyof typeof FORM_STR;
 
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const DARK = {
+  bg:"#0A0A0A", bg2:"#0D0D0D", bg3:"#111",
+  b1:"#1a1a1a", b2:"#111",
+  t1:"#fff", t2:"#888", t3:"#555", t4:"#333",
+  nav:"rgba(8,8,8,0.97)", navBorder:"#111",
+  pa:"#fff", pat:"#000", pi:"#111", pit:"#555", pib:"#1e1e1e",
+  sl:"#444", sl2:"#333",
+  rpBg:"#111", rpBorder:"#2a2a2a", rpText:"#555",
+  inputBg:"#0D0D0D", inputBorder:"#1a1a1a", inputText:"#ccc",
+} as const;
+const LITE = {
+  bg:"#F9F9F9", bg2:"#FFFFFF", bg3:"#F5F5F5",
+  b1:"#F0F0F0", b2:"#F0F0F0",
+  t1:"#1E1E1E", t2:"#666", t3:"#ABABAB", t4:"#C0C0C0",
+  nav:"#FFFFFF", navBorder:"#F0F0F0",
+  pa:"#1E1E1E", pat:"#FFF", pi:"#F0F0F0", pit:"#888", pib:"transparent",
+  sl:"#1A1A1A", sl2:"#ABABAB",
+  rpBg:"#F0F0F0", rpBorder:"#E0E0E0", rpText:"#888",
+  inputBg:"#F5F5F5", inputBorder:"#E8E8E8", inputText:"#1E1E1E",
+} as const;
+type Th = { [K in keyof typeof DARK]: string };
+const ThCtx = createContext<Th>(DARK as Th);
+const useTh = () => useContext(ThCtx);
+
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function ago(iso: string) {
   const d = Math.floor((Date.now()-new Date(iso).getTime())/1000);
@@ -110,14 +135,14 @@ function urlBase64ToUint8Array(base64: string) {
 // ─── SKELETON ITEM ────────────────────────────────────────────────────────────
 function SkeletonItem() {
   return (
-    <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"0.5px solid #1a1a1a"}}>
-      <div style={{width:7,height:7,borderRadius:"50%",background:"#1e1e1e",flexShrink:0}}/>
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"0.5px solid var(--hsep)"}}>
+      <div style={{width:7,height:7,borderRadius:"50%",background:"var(--sk-dot)",flexShrink:0}}/>
       <div style={{flex:1}}>
-        <div style={{height:12,width:"45%",borderRadius:4,background:"#141414",marginBottom:6,overflow:"hidden",position:"relative" as const}}>
-          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.04) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
+        <div style={{height:12,width:"45%",borderRadius:4,background:"var(--sk-bar)",marginBottom:6,overflow:"hidden",position:"relative" as const}}>
+          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(128,128,128,0.08) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
         </div>
-        <div style={{height:10,width:"65%",borderRadius:4,background:"#111",overflow:"hidden",position:"relative" as const}}>
-          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.04) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
+        <div style={{height:10,width:"65%",borderRadius:4,background:"var(--sk-bar2)",overflow:"hidden",position:"relative" as const}}>
+          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(128,128,128,0.08) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
         </div>
       </div>
     </div>
@@ -423,6 +448,55 @@ const DEMO_REPORTS = [
   {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  latitude:5.5578,longitude:-0.2040,photoUrl:null,                                                                         upvoteCount:2, address:"Ring Road Central",  region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
 ];
 
+// ─── SETTINGS SHEET ───────────────────────────────────────────────────────────
+function SettingsSheet({ theme, onTheme, onClose }: {
+  theme: "dark"|"light"; onTheme:(t:"dark"|"light")=>void; onClose:()=>void;
+}) {
+  const opts: {key:"dark"|"light"; label:string; preview:string}[] = [
+    { key:"dark",  label:"Dark",  preview:"#0A0A0A" },
+    { key:"light", label:"Light", preview:"#F9F9F9" },
+  ];
+  return (
+    <div style={{position:"fixed" as const,inset:0,zIndex:210}}>
+      <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)"}} onClick={onClose}/>
+      <div style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0D0D0D",borderRadius:"20px 20px 0 0",padding:"0 20px 48px",animation:"slideUp .25s cubic-bezier(.32,.72,0,1)"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 24px"}}>
+          <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}}/>
+        </div>
+        <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:"#444",marginBottom:20}}>SETTINGS</div>
+
+        {/* Appearance */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:10,color:"#555",marginBottom:12,fontWeight:700,letterSpacing:.5}}>APPEARANCE</div>
+          <div style={{display:"flex",gap:10}}>
+            {opts.map(o=>{
+              const active = theme===o.key;
+              return(
+                <button key={o.key} onClick={()=>onTheme(o.key)}
+                  style={{flex:1,background:active?"#1a1a1a":"#111",border:`1px solid ${active?"#333":"#1e1e1e"}`,borderRadius:14,padding:"16px 12px",fontFamily:"inherit",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:10}}>
+                  <div style={{width:"100%",height:44,borderRadius:8,background:o.preview,border:`1px solid ${o.key==="light"?"#E0E0E0":"#1a1a1a"}`,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                    <div style={{width:4,height:4,borderRadius:"50%",background:o.key==="light"?"#EF4444":"#EF4444"}}/>
+                    <div style={{width:18,height:2,borderRadius:1,background:o.key==="light"?"#ABABAB":"#555"}}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    {active&&<div style={{width:5,height:5,borderRadius:"50%",background:"#EF4444"}}/>}
+                    <span style={{fontSize:12,fontWeight:600,color:active?"#fff":"#444"}}>{o.label}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <button onClick={onClose}
+          style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:12,padding:"14px",color:"#555",fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── WHATSAPP SHARE ───────────────────────────────────────────────────────────
 function shareWhatsApp(r: any) {
   const h    = hMeta(r.hazardType);
@@ -439,12 +513,12 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
   const sev    = r.severity;
   const isFixed = r.status === "RESOLVED";
 
-  const dotSize  = sev==="CRITICAL" ? 8 : sev==="HIGH" ? 7 : sev==="MEDIUM" ? 6 : 5;
-  const dotColor = sev==="CRITICAL" ? "#EF4444" : sev==="HIGH" ? "#888" : sev==="MEDIUM" ? "#444" : "#2a2a2a";
-  const nameSize = sev==="CRITICAL" ? 19 : sev==="HIGH" ? 14 : 12;
-  const nameColor = sev==="CRITICAL" ? "#FFFFFF" : sev==="HIGH" ? "#888" : "#555";
-  const subSize  = sev==="CRITICAL" ? 11 : sev==="HIGH" ? 10.5 : 10;
-  const subColor = sev==="CRITICAL" ? "#555" : sev==="HIGH" ? "#444" : "#333";
+  const dotSize   = sev==="CRITICAL" ? 8 : sev==="HIGH" ? 7 : sev==="MEDIUM" ? 6 : 5;
+  const dotColor  = sev==="CRITICAL" ? "#EF4444" : sev==="HIGH" ? "var(--hd-h)" : sev==="MEDIUM" ? "var(--hd-m)" : "var(--hd-m)";
+  const nameSize  = sev==="CRITICAL" ? 19 : sev==="HIGH" ? 14 : 12;
+  const nameColor = sev==="CRITICAL" ? "var(--hn-c)" : sev==="HIGH" ? "var(--hn-h)" : "var(--hn-m)";
+  const subSize   = sev==="CRITICAL" ? 11 : sev==="HIGH" ? 10.5 : 10;
+  const subColor  = sev==="CRITICAL" ? "var(--hs-c)" : sev==="HIGH" ? "var(--hs-h)" : "var(--hs-m)";
 
   const subtitle = [SEV_LABEL[sev], h.label, distanceKm != null ? fmtDist(distanceKm) : null]
     .filter(Boolean).join(" · ");
@@ -454,7 +528,7 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
       display:"flex", alignItems:"flex-start", gap:12,
       padding:"13px 0",
       borderTop:"none", borderLeft:"none", borderRight:"none",
-      borderBottom:"0.5px solid #1a1a1a",
+      borderBottom:"0.5px solid var(--hsep)",
       width:"100%", textAlign:"left" as const, fontFamily:"inherit",
       cursor:"pointer", background:"none",
       opacity: isFixed ? 0.22 : 1,
@@ -462,7 +536,7 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
     }}>
       <div style={{paddingTop:4, flexShrink:0}}>
         {isFixed
-          ? <div style={{width:dotSize,height:dotSize,borderRadius:"50%",border:"1px solid #181818"}}/>
+          ? <div style={{width:dotSize,height:dotSize,borderRadius:"50%",border:"1px solid var(--hn-m)"}}/>
           : <div style={{width:dotSize,height:dotSize,borderRadius:"50%",background:dotColor}}/>
         }
       </div>
@@ -475,14 +549,14 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
           {subtitle}{r.address ? ` · ${r.address}` : ""}
         </div>
         {sev==="CRITICAL"&&!isFixed&&(
-          <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid #1a1a1a"}}>
-            <div style={{fontSize:10,color:"#444",lineHeight:1.5}}>
+          <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid var(--hsep)"}}>
+            <div style={{fontSize:10,color:"var(--hblrb)",lineHeight:1.5}}>
               {h.label} on {r.address||"this road"}{distanceKm!=null ? ` — ${fmtDist(distanceKm)} from you` : ""}.
             </div>
           </div>
         )}
       </div>
-      <div style={{paddingTop:5,flexShrink:0,color:"#2a2a2a",fontSize:14,lineHeight:1}}>›</div>
+      <div style={{paddingTop:5,flexShrink:0,color:"var(--hchev)",fontSize:14,lineHeight:1}}>›</div>
     </button>
   );
 }
@@ -781,6 +855,8 @@ export default function PublicPage() {
   const [onboarded,     setOnboarded]     = useState(true);
   const [pushEnabled,   setPushEnabled]   = useState(false);
   const [sheetReport,   setSheetReport]   = useState<any>(null);
+  const [themeName,     setThemeName]     = useState<"dark"|"light">("dark");
+  const [showSettings,  setShowSettings]  = useState(false);
   const fabRef   = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -812,6 +888,10 @@ export default function PublicPage() {
     setWatching(Math.floor(Math.random()*18)+14);
     setIsOnline(navigator.onLine);
     setQueueCount(getQueue().length);
+
+    // Theme
+    const savedTheme = localStorage.getItem("rw_theme") as "dark"|"light"|null;
+    if (savedTheme) setThemeName(savedTheme);
 
     // Onboarding check
     if (!localStorage.getItem("rw_onboarded")) setOnboarded(false);
@@ -961,6 +1041,10 @@ export default function PublicPage() {
     setRouteResult(hits); setChecking(false);
   };
 
+  // ── Theme helper ──
+  const th = themeName === "light" ? LITE : DARK;
+  const onThemeChange = (t: "dark"|"light") => { setThemeName(t); localStorage.setItem("rw_theme", t); };
+
   // ── Derived state ──
   const sq             = search.trim().toLowerCase();
   const userLat        = gps.lat as number|null;
@@ -1001,7 +1085,8 @@ export default function PublicPage() {
   };
 
   return(
-    <div style={{background:"#0A0A0A",minHeight:"100vh",fontFamily:"'Inter',-apple-system,sans-serif",color:"#fff",paddingBottom:100}}>
+    <ThCtx.Provider value={th}>
+    <div className={themeName==="light"?"lt":""} style={{background:th.bg,minHeight:"100vh",fontFamily:"'Inter',-apple-system,sans-serif",color:th.t1,paddingBottom:100}}>
       <style>{`
         @keyframes fadeUp    {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp   {from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -1014,8 +1099,23 @@ export default function PublicPage() {
         @keyframes successPop {0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
         *{box-sizing:border-box;margin:0;padding:0}
         button{cursor:pointer;-webkit-tap-highlight-color:transparent}
-        input::placeholder{color:#333}
+        input::placeholder{color:var(--ph,#333)}
         ::-webkit-scrollbar{display:none}
+        :root{
+          --hsep:#1a1a1a;--hchev:#2a2a2a;--hblrb:#444;
+          --hn-c:#fff;--hn-h:#888;--hn-m:#555;
+          --hd-h:#888;--hd-m:#444;
+          --hs-c:#555;--hs-h:#444;--hs-m:#333;
+          --sk-dot:#1e1e1e;--sk-bar:#141414;--sk-bar2:#111;
+        }
+        .lt{
+          --hsep:#F0F0F0;--hchev:#C8C8C8;--hblrb:#ABABAB;
+          --hn-c:#ABABAB;--hn-h:#5A5A5A;--hn-m:#282828;
+          --hd-h:#282828;--hd-m:#181818;
+          --hs-c:#2E2E2E;--hs-h:#242424;--hs-m:#181818;
+          --sk-dot:#E0E0E0;--sk-bar:#EBEBEB;--sk-bar2:#F0F0F0;
+          --ph:#ABABAB;
+        }
       `}</style>
 
       {/* ── ONBOARDING ── */}
@@ -1043,27 +1143,36 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:"#0A0A0A",borderBottom:"0.5px solid #111",padding:"14px 18px",position:"sticky" as const,top:0,zIndex:50,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"14px 18px",position:"sticky" as const,top:0,zIndex:50,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
         <div>
           <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:4}}>ROADWATCH</div>
-          <div style={{fontSize:18,fontWeight:400,color:"#555",lineHeight:1.2,marginBottom:3}}>
+          <div style={{fontSize:18,fontWeight:400,color:th.t3,lineHeight:1.2,marginBottom:3}}>
             {activeReports.length} hazard{activeReports.length!==1?"s":""} near you
           </div>
-          <div style={{fontSize:10,color:"#333"}}>
+          <div style={{fontSize:10,color:th.t4}}>
             {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
           </div>
         </div>
-        {user ? (
-          <button onClick={()=>signOut().then(()=>setUser(null))}
-            style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#555",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3,marginTop:4,flexShrink:0}}>
-            {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
+        <div style={{display:"flex",gap:6,alignItems:"center",marginTop:4,flexShrink:0}}>
+          {user ? (
+            <button onClick={()=>signOut().then(()=>setUser(null))}
+              style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,padding:"5px 10px",color:th.t3,fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
+              {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
+            </button>
+          ) : (
+            <button onClick={()=>setShowAuth(true)}
+              style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,padding:"5px 11px",color:th.t3,fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
+              Sign in
+            </button>
+          )}
+          <button onClick={()=>setShowSettings(true)} aria-label="Settings"
+            style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="2" stroke={th.t3} strokeWidth="1.2"/>
+              <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t3} strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
           </button>
-        ) : (
-          <button onClick={()=>setShowAuth(true)}
-            style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 11px",color:"#555",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit",marginTop:4,flexShrink:0}}>
-            Sign in
-          </button>
-        )}
+        </div>
       </div>
 
       {/* ══ FEED TAB ══ */}
@@ -1076,13 +1185,13 @@ export default function PublicPage() {
               {visibleAnnouncements.map(a=>{
                 const isEmergency=a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
                 return(
-                  <div key={a.id} style={{background:"#0D0D0D",border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":"#1a1a1a"}`,borderLeft:`2px solid ${isEmergency?"#EF4444":"#2a2a2a"}`,borderRadius:10,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:8}}>
+                  <div key={a.id} style={{background:th.bg2,border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":th.b1}`,borderLeft:`2px solid ${isEmergency?"#EF4444":th.b1}`,borderRadius:10,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1}}>
-                      <div style={{color:"#444",fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:3}}>{a.region||"NATIONAL"}</div>
-                      <div style={{color:"#ccc",fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
-                      <div style={{color:"#555",fontSize:11,lineHeight:1.5}}>{a.body}</div>
+                      <div style={{color:th.t4,fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:3}}>{a.region||"NATIONAL"}</div>
+                      <div style={{color:th.t1,fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
+                      <div style={{color:th.t3,fontSize:11,lineHeight:1.5}}>{a.body}</div>
                     </div>
-                    <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))} style={{background:"none",border:"none",color:"#333",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                    <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))} style={{background:"none",border:"none",color:th.t4,fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
                   </div>
                 );
               })}
@@ -1092,8 +1201,8 @@ export default function PublicPage() {
           {/* My Reports (signed-in users) */}
           {user&&myReports.length>0&&(
             <div style={{padding:"0 18px"}}>
-              <div style={{borderTop:"0.5px solid #1a1a1a",padding:"12px 0 0",marginTop:12}}>
-                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#444",marginBottom:4}}>MY REPORTS · {myReports.length}</div>
+              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"12px 0 0",marginTop:12}}>
+                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl,marginBottom:4}}>MY REPORTS · {myReports.length}</div>
               </div>
               {myReports.slice(0,3).map(r=>(
                 <HazardItem key={r.id} r={r}
@@ -1107,13 +1216,13 @@ export default function PublicPage() {
           <div style={{padding:"12px 18px 0"}}>
             <div style={{position:"relative" as const,marginBottom:12}}>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 12px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
-              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#444",fontSize:18,lineHeight:1}}>×</button>}
+                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:th.t4,fontSize:18,lineHeight:1}}>×</button>}
             </div>
             <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4}}>
               {[{key:"All",label:"All"},...H].map(hx=>(
                 <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?"#fff":"#111",border:`1px solid ${hazardFilter===hx.key?"#fff":"#1e1e1e"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#000":"#555",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
+                  style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
                   {hx.label}
                 </button>
               ))}
@@ -1122,8 +1231,8 @@ export default function PublicPage() {
 
           {/* Feed list */}
           <div style={{padding:"0 18px"}}>
-            <div style={{borderTop:"0.5px solid #1a1a1a",padding:"10px 0 8px",marginTop:14}}>
-              <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#444"}}>NEAREST FIRST</div>
+            <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 8px",marginTop:14}}>
+              <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl}}>NEAREST FIRST</div>
             </div>
 
             {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
@@ -1131,9 +1240,9 @@ export default function PublicPage() {
             {!loading&&(feedReports.length===0
               ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
                 <div style={{fontSize:44,marginBottom:12,opacity:.15}}>👁️</div>
-                <div style={{color:"#fff",fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
-                <div style={{color:"#555",fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
-                <button onClick={onReport} style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:14,padding:"14px 28px",color:"#888",fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
+                <div style={{color:th.t1,fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
+                <div style={{color:th.t3,fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
+                <button onClick={onReport} style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:14,padding:"14px 28px",color:th.t3,fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
                   Report a Hazard
                 </button>
               </div>
@@ -1144,8 +1253,8 @@ export default function PublicPage() {
 
             {!loading&&fixedReports.length>0&&(
               <>
-                <div style={{borderTop:"0.5px solid #1a1a1a",padding:"14px 0 10px",marginTop:8}}>
-                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#333"}}>FIXED · {fixedReports.length}</div>
+                <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"14px 0 10px",marginTop:8}}>
+                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl2}}>FIXED · {fixedReports.length}</div>
                 </div>
                 {fixedReports.map(r=>(
                   <HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>
@@ -1161,47 +1270,47 @@ export default function PublicPage() {
       {tab==="route"&&(
         <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
           <div style={{marginBottom:20}}>
-            <div style={{color:"#fff",fontWeight:700,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
-            <div style={{color:"#555",fontSize:13}}>See what citizens have reported along any road.</div>
+            <div style={{color:th.t1,fontWeight:700,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
+            <div style={{color:th.t3,fontSize:13}}>See what citizens have reported along any road.</div>
           </div>
 
           <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#333",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:th.t4,flexShrink:0}}/>
               <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="From — e.g. Spintex Road"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:12,padding:"13px 12px 13px 32px",color:th.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#333",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:th.t4,flexShrink:0}}/>
               <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="To — e.g. Tema Motorway"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:12,padding:"13px 12px 13px 32px",color:th.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
-              style={{background:routeFrom.trim()&&routeTo.trim()?"#222":"#111",border:`1px solid ${routeFrom.trim()&&routeTo.trim()?"#333":"#1a1a1a"}`,borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#ccc":"#333",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              {checking?<><div style={{width:16,height:16,border:"2px solid #333",borderTopColor:"#888",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>Check Route</>}
+              style={{background:routeFrom.trim()&&routeTo.trim()?th.bg3:th.bg2,border:`1px solid ${routeFrom.trim()&&routeTo.trim()?th.b1:th.b1}`,borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?th.t2:th.t4,fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {checking?<><div style={{width:16,height:16,border:`2px solid ${th.b1}`,borderTopColor:th.t2,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>Check Route</>}
             </button>
           </div>
 
           {/* Safety score */}
           {safetyScore!==null&&(
-            <div style={{background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
               <div style={{textAlign:"center" as const,flexShrink:0}}>
                 <div style={{color:scoreColor(safetyScore),fontSize:28,fontWeight:700,lineHeight:1}}>{safetyScore}</div>
-                <div style={{color:"#444",fontSize:10,marginTop:1}}>/ 10</div>
+                <div style={{color:th.t4,fontSize:10,marginTop:1}}>/ 10</div>
               </div>
               <div>
                 <div style={{color:scoreColor(safetyScore),fontWeight:700,fontSize:14,letterSpacing:.5}}>{scoreLabel(safetyScore)}</div>
-                <div style={{color:"#444",fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
+                <div style={{color:th.t4,fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
               </div>
             </div>
           )}
 
           {routeResult!==null&&(
             <div style={{animation:"fadeUp .15s ease"}}>
-              <div style={{borderTop:"0.5px solid #1a1a1a",padding:"10px 0 8px",marginBottom:4}}>
-                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#444"}}>
+              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 8px",marginBottom:4}}>
+                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl}}>
                   {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} ON THIS ROUTE`}
                 </div>
               </div>
@@ -1217,7 +1326,7 @@ export default function PublicPage() {
           )}
 
           {routeResult===null&&!checking&&(
-            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#333",fontSize:13}}>
+            <div style={{textAlign:"center" as const,padding:"32px 0",color:th.t4,fontSize:13}}>
               Enter a start and end point to see citizen reports along that road.
             </div>
           )}
@@ -1358,6 +1467,11 @@ export default function PublicPage() {
         </div>
       )}
 
+      {/* Settings sheet */}
+      {showSettings&&(
+        <SettingsSheet theme={themeName} onTheme={onThemeChange} onClose={()=>setShowSettings(false)}/>
+      )}
+
       {/* Hazard detail sheet */}
       {sheetReport&&(
         <HazardSheet
@@ -1370,7 +1484,7 @@ export default function PublicPage() {
       )}
 
       {/* ── BOTTOM NAV ── */}
-      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"0.5px solid #111",backdropFilter:"blur(20px)"}}>
+      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:th.nav,borderTop:`0.5px solid ${th.navBorder}`,backdropFilter:"blur(20px)"}}>
         <div style={{display:"flex",alignItems:"center",padding:"10px 16px 28px",gap:8}}>
           {/* Feed tab */}
           <button onClick={()=>setTab("feed")} aria-label="Feed"
@@ -1384,13 +1498,13 @@ export default function PublicPage() {
           </button>
           {/* Report pill */}
           <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
-            style={{flex:1,background:"#111",border:"0.5px solid #2a2a2a",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
+            style={{flex:1,background:th.rpBg,border:`0.5px solid ${th.rpBorder}`,borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
             <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
-              <path d="M7 1L13 12H1L7 1Z" stroke="#555" strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
-              <line x1="7" y1="5.5" x2="7" y2="8.5" stroke="#555" strokeWidth="1.2" strokeLinecap="round"/>
-              <circle cx="7" cy="10" r="0.7" fill="#555"/>
+              <path d="M7 1L13 12H1L7 1Z" stroke={th.rpText} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
+              <line x1="7" y1="5.5" x2="7" y2="8.5" stroke={th.rpText} strokeWidth="1.2" strokeLinecap="round"/>
+              <circle cx="7" cy="10" r="0.7" fill={th.rpText}/>
             </svg>
-            <span style={{fontSize:12,fontWeight:500,color:"#555",letterSpacing:.2}}>Report a hazard</span>
+            <span style={{fontSize:12,fontWeight:500,color:th.rpText,letterSpacing:.2}}>Report a hazard</span>
           </button>
           {/* Route tab */}
           <button onClick={()=>setTab("route")} aria-label="Route"
@@ -1403,5 +1517,6 @@ export default function PublicPage() {
         </div>
       </div>
     </div>
+    </ThCtx.Provider>
   );
 }
