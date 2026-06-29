@@ -1241,34 +1241,20 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:th.bg,padding:"16px 18px 12px",position:"sticky" as const,top:0,zIndex:50,borderBottom:`0.5px solid ${th.b2}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-          <div style={{flex:1}}>
-            <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:4}}>ROADWATCH GH</div>
-            <div style={{fontSize:22,fontWeight:700,color:th.t1,letterSpacing:-.5,lineHeight:1.15,marginBottom:3}}>Watch the roads.</div>
-            <div style={{fontSize:11,color:th.t3,lineHeight:1.4}}>Live hazards. Smarter commutes. Safer cities.</div>
+      <div style={{background:th.bg,padding:"18px 18px 14px",position:"sticky" as const,top:0,zIndex:50}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+          <div>
+            <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:5}}>ROADWATCH GH</div>
+            <div style={{fontSize:26,fontWeight:700,color:th.t1,letterSpacing:-.6,lineHeight:1.1,marginBottom:5}}>Watch the roads.</div>
+            <div style={{fontSize:11,color:th.t3}}>Live hazards. Smarter commutes. Safer cities.</div>
           </div>
-          <div style={{display:"flex",flexDirection:"column" as const,alignItems:"flex-end",gap:8,flexShrink:0}}>
-            <button onClick={()=>setShowDestSheet(true)}
-              style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:100,padding:"8px 14px",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M6 1C4.07 1 2.5 2.57 2.5 4.5c0 2.63 3.5 6.5 3.5 6.5s3.5-3.87 3.5-6.5C9.5 2.57 7.93 1 6 1z" stroke="#EF4444" strokeWidth="1.1" fill="none"/>
-                <circle cx="6" cy="4.5" r="1.2" fill="#EF4444"/>
-              </svg>
-              <span style={{color:th.t2,fontSize:11,fontWeight:600}}>{routeFrom&&routeTo ? `${routeFrom} → ${routeTo}` : "Set destination"}</span>
-            </button>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              {user
-                ? <button onClick={()=>signOut().then(()=>setUser(null))} style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>{user.email?.split("@")[0]||"Me"} · out</button>
-                : <button onClick={()=>setShowAuth(true)} style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>Sign in</button>
-              }
-              <button onClick={()=>setShowSettings(true)} aria-label="Settings" style={{background:"none",border:"none",display:"flex",alignItems:"center"}}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-          </div>
+          <button onClick={()=>setShowDestSheet(true)} style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:100,padding:"9px 14px",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",flexShrink:0,marginTop:2}}>
+            <svg width="11" height="14" viewBox="0 0 11 14" fill="none">
+              <path d="M5.5 0C3.02 0 1 2.02 1 4.5c0 3.19 4.5 9 4.5 9s4.5-5.81 4.5-9C10 2.02 7.98 0 5.5 0z" fill="#EF4444"/>
+              <circle cx="5.5" cy="4.5" r="1.8" fill="#fff"/>
+            </svg>
+            <span style={{color:th.t1,fontSize:11,fontWeight:600}}>{routeFrom&&routeTo?`${routeFrom} → ${routeTo}`:"Set destination"}</span>
+          </button>
         </div>
       </div>
 
@@ -1276,130 +1262,84 @@ export default function PublicPage() {
       {tab==="home"&&(
         <div style={{animation:"fadeUp .18s ease",paddingBottom:120}}>
 
-          {/* Search bar */}
-          <div style={{padding:"12px 18px 8px"}}>
-            <div style={{position:"relative" as const}}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{position:"absolute" as const,left:11,top:"50%",transform:"translateY(-50%)",pointerEvents:"none" as const}}>
-                <circle cx="6" cy="6" r="4.5" stroke={th.t4} strokeWidth="1.2"/>
-                <path d="M9.5 9.5L13 13" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px 9px 32px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
-              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:th.t4,fontSize:18,lineHeight:1}}>×</button>}
-            </div>
-          </div>
-
-          {/* Filter pills */}
-          <div style={{padding:"0 18px 10px",display:"flex",gap:6,flexWrap:"wrap" as const}}>
-            {[{key:"All",label:"All"},...H]
-              .filter((_,i) => pillsExpanded || i < 4)
-              .map(hx=>(
-                <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
-                  {hx.label}
-                </button>
-              ))}
-            <button onClick={()=>setPillsExpanded(p=>!p)}
-              style={{flexShrink:0,background:th.pi,border:`1px solid ${th.pib}`,borderRadius:20,padding:"6px 12px",color:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
-              {pillsExpanded ? "Less" : "More"}
-            </button>
-          </div>
-
           {/* Critical alert banner */}
           {(()=>{
-            const crit = (routeResult ?? feedReports).find((r:any)=>r.severity==="CRITICAL");
-            if (!crit) return null;
-            const h = hMeta(crit.hazardType);
-            const dist = crit._dist != null ? ` · ${fmtDist(crit._dist)} ahead` : "";
-            return (
-              <div style={{margin:"0 18px 12px"}} onClick={()=>setSheetReport(crit)}>
-                <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.22)",borderRadius:14,padding:"13px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{flexShrink:0}}>
-                    <path d="M9 2L16.5 15H1.5L9 2Z" fill="rgba(239,68,68,0.18)" stroke="#EF4444" strokeWidth="1.3" strokeLinejoin="round"/>
-                    <line x1="9" y1="7" x2="9" y2="11" stroke="#EF4444" strokeWidth="1.3" strokeLinecap="round"/>
-                    <circle cx="9" cy="13" r="0.7" fill="#EF4444"/>
+            const crit=(routeResult??feedReports).find((r:any)=>r.severity==="CRITICAL");
+            if(!crit) return null;
+            const h=hMeta(crit.hazardType);
+            const dist=crit._dist!=null?` · ${fmtDist(crit._dist)} ahead`:"";
+            return(
+              <div style={{padding:"12px 18px 0"}} onClick={()=>setSheetReport(crit)}>
+                <div style={{background:"rgba(100,20,20,0.55)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:16,padding:"15px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+                  <svg width="22" height="20" viewBox="0 0 22 20" fill="none" style={{flexShrink:0}}>
+                    <path d="M11 1L21 19H1L11 1Z" fill="#F59E0B" stroke="#F59E0B" strokeWidth="0.5" strokeLinejoin="round"/>
+                    <line x1="11" y1="8" x2="11" y2="13" stroke="#1a0808" strokeWidth="2" strokeLinecap="round"/>
+                    <circle cx="11" cy="16" r="1.1" fill="#1a0808"/>
                   </svg>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>
+                    <div style={{fontSize:14,fontWeight:700,lineHeight:1.3,marginBottom:3}}>
                       <span style={{color:"#EF4444"}}>{criticalCount} critical hazard{criticalCount!==1?"s":""}</span>
-                      <span style={{color:th.t2}}> on your route</span>
+                      <span style={{color:"#fff"}}> on your route</span>
                     </div>
-                    <div style={{fontSize:11,color:th.t3,marginTop:2}}>{h.label} on {crit.address||"this road"}{dist}</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>{h.label} on {crit.address||"this road"}{dist}</div>
                   </div>
-                  <span style={{color:th.t4,fontSize:16}}>›</span>
+                  <span style={{color:"rgba(255,255,255,0.4)",fontSize:18}}>›</span>
                 </div>
               </div>
             );
           })()}
 
-          {/* Map */}
-          <div style={{height:250,margin:"0 0 14px",position:"relative" as const}}>
-            <MapView reports={routeResult??reports} hazardFilter={hazardFilter} onConfirm={doConfirm} confirmed={confirmed}/>
+          {/* Map — edge to edge */}
+          <div style={{height:300,margin:"14px 0 0",position:"relative" as const}}>
+            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed}/>
           </div>
 
-          {/* ON YOUR ROUTE / NEAR YOU section */}
-          <div style={{padding:"0 18px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <circle cx="4" cy="4" r="2" stroke={th.t3} strokeWidth="1.2" fill="none"/>
-                  <circle cx="10" cy="10" r="2" stroke={th.t3} strokeWidth="1.2" fill="none"/>
-                  <path d="M4 6c0 2 2 4 6 4" stroke={th.t3} strokeWidth="1.2" strokeLinecap="round"/>
+          {/* ON YOUR ROUTE section */}
+          <div style={{padding:"20px 18px 0"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="4" cy="4" r="2.5" stroke={th.t2} strokeWidth="1.2" fill="none"/>
+                  <circle cx="12" cy="12" r="2.5" stroke={th.t2} strokeWidth="1.2" fill="none"/>
+                  <path d="M4 6.5C4 9 6 10 8 10s4 1 4 3.5" stroke={th.t2} strokeWidth="1.2" strokeLinecap="round"/>
                 </svg>
-                <span style={{fontSize:9,fontWeight:800,letterSpacing:2,color:th.t3}}>
-                  {routeResult ? "ON YOUR ROUTE" : "NEAR YOU"}
-                </span>
+                <span style={{fontSize:10,fontWeight:800,letterSpacing:2,color:th.t2}}>{routeResult?"ON YOUR ROUTE":"NEAR YOU"}</span>
               </div>
               {(routeResult??feedReports).length>3&&(
                 <button onClick={()=>setFeedExpanded(p=>!p)}
-                  style={{background:"none",border:"none",color:"#EF4444",fontSize:12,fontWeight:700,fontFamily:"inherit",display:"flex",alignItems:"center",gap:3}}>
-                  {feedExpanded ? "Less" : "See all"} <span style={{fontSize:14}}>›</span>
+                  style={{background:"none",border:"none",color:"#EF4444",fontSize:13,fontWeight:700,fontFamily:"inherit",display:"flex",alignItems:"center",gap:2}}>
+                  {feedExpanded?"Less":"See all"} <span style={{fontSize:16,lineHeight:1}}>›</span>
                 </button>
               )}
             </div>
 
-            <div style={{background:th.bg2,borderRadius:14,overflow:"hidden",border:`1px solid ${th.b1}`}}>
+            <div style={{background:th.bg2,borderRadius:16,overflow:"hidden"}}>
               {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
               {!loading&&(()=>{
-                const items = routeResult ?? feedReports;
-                const shown = feedExpanded ? items : items.slice(0,3);
-                if (shown.length===0) return (
-                  <div style={{padding:"28px",textAlign:"center" as const,color:th.t4,fontSize:13}}>No hazards found.</div>
+                const items=routeResult??feedReports;
+                const shown=feedExpanded?items:items.slice(0,3);
+                if(shown.length===0) return(
+                  <div style={{padding:"32px",textAlign:"center" as const,color:th.t4,fontSize:13}}>No hazards found.</div>
                 );
-                return shown.map((r:any,i:number)=>(
-                  <button key={r.id} onClick={()=>setSheetReport(r)}
-                    style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:"none",border:"none",borderBottom:i<shown.length-1?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:r.severity==="CRITICAL"?"#EF4444":r.severity==="HIGH"?"#555":"#333",flexShrink:0}}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:600,color:th.t1,marginBottom:2}}>{r.address||hMeta(r.hazardType).label}</div>
-                      <div style={{fontSize:11,color:r.severity==="CRITICAL"?"#EF4444":th.t3}}>
-                        {SEV_LABEL[r.severity]} · {hMeta(r.hazardType).label}{r._dist!=null ? ` · ${fmtDist(r._dist)} ahead` : ""}
+                return shown.map((r:any,i:number)=>{
+                  const sevColor=r.severity==="CRITICAL"?"#EF4444":r.severity==="HIGH"?"#888":"#555";
+                  return(
+                    <button key={r.id} onClick={()=>setSheetReport(r)}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"15px 16px",background:"none",border:"none",borderBottom:i<shown.length-1?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
+                      <div style={{width:9,height:9,borderRadius:"50%",background:r.severity==="CRITICAL"?"#EF4444":"#444",flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:15,fontWeight:600,color:th.t1,marginBottom:3}}>{r.address||hMeta(r.hazardType).label}</div>
+                        <div style={{fontSize:12,color:th.t3}}>
+                          <span style={{color:sevColor,fontWeight:600}}>{SEV_LABEL[r.severity]}</span>
+                          {" · "}{hMeta(r.hazardType).label}{r._dist!=null?` · ${fmtDist(r._dist)} ahead`:""}
+                        </div>
                       </div>
-                    </div>
-                    <span style={{color:th.t4,fontSize:16,flexShrink:0}}>›</span>
-                  </button>
-                ));
+                      <span style={{color:th.t4,fontSize:18,flexShrink:0}}>›</span>
+                    </button>
+                  );
+                });
               })()}
             </div>
-
-            {!loading&&fixedReports.length>0&&(
-              <div style={{marginTop:16}}>
-                <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:th.sl2,marginBottom:8}}>FIXED RECENTLY</div>
-                <div style={{background:th.bg2,borderRadius:14,overflow:"hidden",border:`1px solid ${th.b1}`}}>
-                  {fixedReports.slice(0,2).map((r,i)=>(
-                    <button key={r.id} onClick={()=>setSheetReport(r)}
-                      style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:"none",border:"none",borderBottom:i===0?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer",opacity:0.5}}>
-                      <div style={{width:7,height:7,borderRadius:"50%",border:`1px solid ${th.t4}`,flexShrink:0}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:600,color:th.t2,textDecoration:"line-through"}}>{hMeta(r.hazardType).label}</div>
-                        <div style={{fontSize:11,color:th.t4}}>{r.address}</div>
-                      </div>
-                      <span style={{color:th.t4,fontSize:16}}>›</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
