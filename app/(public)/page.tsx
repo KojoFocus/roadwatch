@@ -1208,7 +1208,6 @@ export default function PublicPage() {
           <button onClick={()=>setShowSettings(true)} aria-label="Settings"
             style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="2" stroke={th.t3} strokeWidth="1.2"/>
               <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t3} strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
           </button>
@@ -1538,7 +1537,7 @@ export default function PublicPage() {
           </button>
           {/* Report pill */}
           <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
-            style={{flex:1,background:th.rpBg,border:`0.5px solid ${th.rpBorder}`,borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
+            style={{flex:1,background:th.rpBg,border:"none",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
             <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
               <path d="M7 1L13 12H1L7 1Z" stroke={th.rpText} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
               <line x1="7" y1="5.5" x2="7" y2="8.5" stroke={th.rpText} strokeWidth="1.2" strokeLinecap="round"/>
