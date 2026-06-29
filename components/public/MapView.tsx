@@ -32,17 +32,16 @@ interface Props {
   hazardFilter: string;
   onConfirm:    (id: string) => void;
   confirmed:    Record<string, boolean>;
+  showRoute?:   boolean;
 }
 
-export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed }: Props) {
+export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, showRoute }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<maplibregl.Map | null>(null);
-  const [ready,      setReady]      = useState(false);
-  const [pinCount,   setPinCount]   = useState(0);
+  const [ready,      setReady]  = useState(false);
   const [selected,   setSelected]   = useState<any | null>(null);
   const [webGLOk,    setWebGLOk]    = useState(true);
   const [mapError,   setMapError]   = useState(false);
-  const [showLegend, setShowLegend] = useState(false);
 
   // Init map once
   useEffect(() => {
@@ -56,7 +55,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       container:          containerRef.current,
       style:              "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center:             [-0.187, 5.604],
-      zoom:               11,
+      zoom:               13,
       attributionControl: false,
     });
 
@@ -83,7 +82,6 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       r.status !== "DISMISSED" &&
       (hazardFilter === "All" || r.hazardType === hazardFilter)
     );
-    setPinCount(visible.length);
 
     const geojson: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
@@ -166,6 +164,19 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         },
       });
 
+      // Route line
+      map.addSource("route", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id:     "route-line",
+        type:   "line",
+        source: "route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint:  { "line-color": "#EF4444", "line-width": 3, "line-opacity": 0.85 },
+      }, "unclustered-point");
+
       // Click cluster → zoom in to expand
       map.on("click", "clusters", async (e: any) => {
         e.originalEvent.stopPropagation();
@@ -208,10 +219,24 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       map.on("mouseleave", "unclustered-point", () => { map.getCanvas().style.cursor = ""; });
     }
 
+    // Draw route line through visible points (sorted by distance if available)
+    const routeSrc = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
+    if (routeSrc && visible.length >= 2) {
+      const coords = [...visible]
+        .sort((a, b) => (a._dist ?? 0) - (b._dist ?? 0))
+        .map(r => [r.longitude, r.latitude] as [number, number]);
+      routeSrc.setData({
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }],
+      });
+    } else if (routeSrc) {
+      routeSrc.setData({ type: "FeatureCollection", features: [] });
+    }
+
     if (visible.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
       visible.forEach(r => bounds.extend([r.longitude, r.latitude]));
-      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 600 });
+      map.fitBounds(bounds, { padding: 80, maxZoom: 14, minZoom: 12, duration: 600 });
     }
   }, [ready, reports, hazardFilter]);
 
@@ -263,46 +288,6 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
 
-      {/* Pin count badge */}
-      {ready && (
-        <div style={{ position:"absolute", top:10, left:10, background:"rgba(10,10,10,0.85)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"5px 12px", display:"flex", alignItems:"center", gap:6 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background:"#444", display:"inline-block" }}/>
-          <span style={{ color:"#ccc", fontSize:11, fontWeight:700 }}>{pinCount} active</span>
-        </div>
-      )}
-
-      {/* Legend toggle */}
-      {ready && (
-        <button onClick={() => setShowLegend(l => !l)} aria-label="Toggle map legend" aria-expanded={showLegend}
-          style={{ position:"absolute", top:10, left:120, zIndex:20, background:"rgba(10,10,10,0.85)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"5px 12px", color:showLegend?"#fff":"#888", fontSize:11, fontWeight:700, fontFamily:"inherit" }}>
-          ◈ Legend
-        </button>
-      )}
-
-      {/* Legend panel */}
-      {showLegend && (
-        <div style={{ position:"absolute", top:44, left:120, zIndex:20, background:"rgba(10,10,10,0.97)", backdropFilter:"blur(12px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, padding:"12px 14px", minWidth:154, animation:"fadeUp .15s ease" }}>
-          <div style={{ fontSize:9, fontWeight:900, letterSpacing:2, color:"#444", marginBottom:10 }}>SEVERITY</div>
-          {[
-            { label:"Critical",  color:"#EF4444" },
-            { label:"Dangerous", color:"#1a1a1a" },
-            { label:"Moderate",  color:"#555555" },
-            { label:"Minor",     color:"#999999" },
-          ].map(({ label, color }) => (
-            <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
-              <div style={{ width:11, height:11, borderRadius:"50%", background:color, flexShrink:0, boxShadow:`0 0 6px ${color}66` }}/>
-              <span style={{ color:"#ccc", fontSize:12 }}>{label}</span>
-            </div>
-          ))}
-          <div style={{ borderTop:"1px solid #1e1e1e", marginTop:6, paddingTop:8, display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:22, height:22, borderRadius:"50%", background:"#1a1a1a", border:"1px solid #333", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>3</span>
-            </div>
-            <span style={{ color:"#888", fontSize:11 }}>Cluster — tap to expand</span>
-          </div>
-        </div>
-      )}
-
       {/* Selected report card */}
       {selected && (
         <div style={{ position:"absolute", bottom:16, left:12, right:12, zIndex:10, background:"rgba(13,13,13,0.97)", backdropFilter:"blur(12px)", border:`1px solid ${SC[selected.severity]}33`, borderLeft:`3px solid ${SC[selected.severity]}`, borderRadius:16, padding:"14px", animation:"fadeUp .15s ease" }}>
@@ -339,7 +324,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       )}
 
       {/* Empty state */}
-      {ready && pinCount === 0 && (
+      {ready && reports.filter(r => r.latitude && r.longitude && r.status !== "RESOLVED" && r.status !== "DISMISSED").length === 0 && (
         <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", background:"rgba(10,10,10,0.88)", backdropFilter:"blur(8px)", border:"1px solid #1e1e1e", borderRadius:14, padding:"20px 24px", textAlign:"center" as const, maxWidth:240 }}>
           <div style={{ fontSize:32, marginBottom:8 }}>📍</div>
           <div style={{ color:"#fff", fontWeight:700, fontSize:14, marginBottom:4 }}>No pins yet</div>
