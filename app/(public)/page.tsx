@@ -1537,7 +1537,7 @@ export default function PublicPage() {
           </button>
           {/* Report pill */}
           <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
-            style={{flex:1,background:th.rpBg,border:"none",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
+            style={{flex:1,background:"transparent",border:"none",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
             <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
               <path d="M7 1L13 12H1L7 1Z" stroke={th.rpText} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
               <line x1="7" y1="5.5" x2="7" y2="8.5" stroke={th.rpText} strokeWidth="1.2" strokeLinecap="round"/>
