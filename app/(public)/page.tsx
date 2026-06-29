@@ -556,6 +556,7 @@ function shareWhatsApp(r: any) {
 function HazardItem({ r, isNew, distanceKm, onTap }: {
   r: any; isNew?: boolean; distanceKm?: number|null; onTap: () => void;
 }) {
+  const [blurbOpen, setBlurbOpen] = useState(false);
   const h      = hMeta(r.hazardType);
   const sev    = r.severity;
   const isFixed = r.status === "RESOLVED";
@@ -596,11 +597,19 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
           {subtitle}
         </div>
         {sev==="CRITICAL"&&!isFixed&&(
-          <div style={{marginTop:7,paddingTop:7,borderTop:"0.5px solid var(--hsep)",fontSize:12,lineHeight:1.55}}>
-            <span style={{fontWeight:700,color:"var(--hn-c)"}}>Avoid this road. </span>
-            <span style={{color:"var(--hblrb)"}}>
-              {r.upvoteCount>1 ? `${r.upvoteCount} confirmed.` : "Use extreme caution."}
-            </span>
+          <div style={{marginTop:6}}>
+            <button onClick={e=>{e.stopPropagation();setBlurbOpen(o=>!o);}}
+              style={{background:"none",border:"none",padding:0,color:"var(--hs-c)",fontSize:10,fontWeight:700,fontFamily:"inherit",letterSpacing:.3}}>
+              {blurbOpen ? "Hide ↑" : "Details ↓"}
+            </button>
+            {blurbOpen&&(
+              <div style={{marginTop:5,paddingTop:6,borderTop:"0.5px solid var(--hsep)",fontSize:12,lineHeight:1.55}}>
+                <span style={{fontWeight:700,color:"var(--hn-c)"}}>Avoid this road. </span>
+                <span style={{color:"var(--hblrb)"}}>
+                  {r.upvoteCount>1 ? `${r.upvoteCount} confirmed.` : "Use extreme caution."}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
