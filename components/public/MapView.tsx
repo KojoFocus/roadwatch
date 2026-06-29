@@ -54,7 +54,7 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
-      style:              "https://tiles.openfreemap.org/styles/positron",
+      style:              "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center:             [-0.187, 5.604],
       zoom:               11,
       attributionControl: false,

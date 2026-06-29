@@ -495,6 +495,44 @@ const DEMO_REPORTS = [
   {id:"d6",hazardType:"DEBRIS",      severity:"MEDIUM",  status:"RESOLVED",  latitude:5.5578,longitude:-0.2040,photoUrl:null,                                                                         upvoteCount:2, address:"Ring Road Central",  region:"Greater Accra",createdAt:new Date(Date.now()-86400000).toISOString(),resolvedAt:new Date(Date.now()-43200000).toISOString(),resolutionNote:"Removed by GHA crew.",fixedBy:"GHA Roads Team"},
 ];
 
+// ─── DESTINATION SHEET ────────────────────────────────────────────────────────
+function DestinationSheet({ fromVal, toVal, onSet, onClose }: {
+  fromVal:string; toVal:string; onSet:(f:string,t:string)=>void; onClose:()=>void;
+}) {
+  const [from, setFrom] = useState(fromVal);
+  const [to,   setTo]   = useState(toVal);
+  const ready = from.trim() && to.trim();
+  return (
+    <div style={{position:"fixed" as const,inset:0,zIndex:210}}>
+      <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)"}} onClick={onClose}/>
+      <div style={{position:"absolute" as const,bottom:0,left:0,right:0,background:"#0D0D0D",borderRadius:"20px 20px 0 0",padding:"0 20px 48px",animation:"slideUp .25s cubic-bezier(.32,.72,0,1)"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}>
+          <div style={{width:36,height:4,borderRadius:2,background:"#1e1e1e"}}/>
+        </div>
+        <div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:"#444",marginBottom:18}}>SET DESTINATION</div>
+        <div style={{display:"flex",flexDirection:"column" as const,gap:10,marginBottom:16}}>
+          <div style={{position:"relative" as const}}>
+            <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#555"}}/>
+            <input value={from} onChange={e=>setFrom(e.target.value)}
+              placeholder="From — e.g. Spintex Road"
+              style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+          </div>
+          <div style={{position:"relative" as const}}>
+            <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#EF4444"}}/>
+            <input value={to} onChange={e=>setTo(e.target.value)}
+              placeholder="To — e.g. Circle"
+              style={{width:"100%",background:"#111",border:"1px solid #1e1e1e",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+          </div>
+        </div>
+        <button onClick={()=>{onSet(from,to);onClose();}} disabled={!ready}
+          style={{width:"100%",background:ready?"#EF4444":"#111",border:"none",borderRadius:12,padding:"15px",color:ready?"#fff":"#333",fontWeight:700,fontSize:15,fontFamily:"inherit"}}>
+          Check Route
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── SETTINGS SHEET ───────────────────────────────────────────────────────────
 function SettingsSheet({ theme, onTheme, onClose }: {
   theme: "dark"|"light"; onTheme:(t:"dark"|"light")=>void; onClose:()=>void;
@@ -885,7 +923,7 @@ export default function PublicPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [dismissed,     setDismissed]     = useState<Set<string>>(new Set());
   const [isDemo,        setIsDemo]        = useState(true);
-  const [tab,           setTab]           = useState("feed");
+  const [tab,           setTab]           = useState("home");
   const [hazardFilter,  setHazardFilter]  = useState("All");
   const [search,        setSearch]        = useState("");
   const [reporting,     setReporting]     = useState(false);
@@ -916,6 +954,7 @@ export default function PublicPage() {
   const [showSettings,  setShowSettings]  = useState(false);
   const [feedExpanded,  setFeedExpanded]  = useState(false);
   const [pillsExpanded, setPillsExpanded] = useState(false);
+  const [showDestSheet, setShowDestSheet] = useState(false);
   const fabRef   = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -1202,267 +1241,225 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"16px 18px 14px",position:"sticky" as const,top:0,zIndex:50}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444"}}>ROADWATCH</div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {user ? (
-              <button onClick={()=>signOut().then(()=>setUser(null))}
-                style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>
-                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
-              </button>
-            ) : (
-              <button onClick={()=>setShowAuth(true)}
-                style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>
-                Sign in
-              </button>
-            )}
-            <button onClick={()=>setShowSettings(true)} aria-label="Settings"
-              style={{background:"none",border:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-            </button>
+      <div style={{background:th.bg,padding:"16px 18px 12px",position:"sticky" as const,top:0,zIndex:50,borderBottom:`0.5px solid ${th.b2}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:4}}>ROADWATCH GH</div>
+            <div style={{fontSize:22,fontWeight:700,color:th.t1,letterSpacing:-.5,lineHeight:1.15,marginBottom:3}}>Watch the roads.</div>
+            <div style={{fontSize:11,color:th.t3,lineHeight:1.4}}>Live hazards. Smarter commutes. Safer cities.</div>
           </div>
-        </div>
-        <div style={{fontSize:28,fontWeight:700,color:th.t1,lineHeight:1.1,letterSpacing:-.5,marginBottom:5}}>
-          {activeReports.length} hazard{activeReports.length!==1?"s":""}
-          <br/>near you
-        </div>
-        <div style={{fontSize:11,color:th.t3}}>
-          {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
+          <div style={{display:"flex",flexDirection:"column" as const,alignItems:"flex-end",gap:8,flexShrink:0}}>
+            <button onClick={()=>setShowDestSheet(true)}
+              style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:100,padding:"8px 14px",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1C4.07 1 2.5 2.57 2.5 4.5c0 2.63 3.5 6.5 3.5 6.5s3.5-3.87 3.5-6.5C9.5 2.57 7.93 1 6 1z" stroke="#EF4444" strokeWidth="1.1" fill="none"/>
+                <circle cx="6" cy="4.5" r="1.2" fill="#EF4444"/>
+              </svg>
+              <span style={{color:th.t2,fontSize:11,fontWeight:600}}>{routeFrom&&routeTo ? `${routeFrom} → ${routeTo}` : "Set destination"}</span>
+            </button>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {user
+                ? <button onClick={()=>signOut().then(()=>setUser(null))} style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>{user.email?.split("@")[0]||"Me"} · out</button>
+                : <button onClick={()=>setShowAuth(true)} style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>Sign in</button>
+              }
+              <button onClick={()=>setShowSettings(true)} aria-label="Settings" style={{background:"none",border:"none",display:"flex",alignItems:"center"}}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ══ FEED TAB ══ */}
-      {tab==="feed"&&(
-        <div style={{animation:"fadeUp .18s ease"}}>
+      {/* ══ HOME TAB ══ */}
+      {tab==="home"&&(
+        <div style={{animation:"fadeUp .18s ease",paddingBottom:120}}>
 
-          {/* Announcements */}
-          {visibleAnnouncements.length>0&&(
-            <div style={{padding:"12px 18px 0"}}>
-              {visibleAnnouncements.map(a=>{
-                const isEmergency=a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
-                return(
-                  <div key={a.id} style={{background:th.bg2,border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":th.b1}`,borderLeft:`2px solid ${isEmergency?"#EF4444":th.b1}`,borderRadius:10,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{color:th.t4,fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:3}}>{a.region||"NATIONAL"}</div>
-                      <div style={{color:th.t1,fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
-                      <div style={{color:th.t3,fontSize:11,lineHeight:1.5}}>{a.body}</div>
-                    </div>
-                    <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))} style={{background:"none",border:"none",color:th.t4,fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* My Reports (signed-in users) */}
-          {user&&myReports.length>0&&(
-            <div style={{padding:"0 18px"}}>
-              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"12px 0 0",marginTop:12}}>
-                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl,marginBottom:4}}>MY REPORTS · {myReports.length}</div>
-              </div>
-              {myReports.slice(0,3).map(r=>(
-                <HazardItem key={r.id} r={r}
-                  distanceKm={feedReports.find((fr:any)=>fr.id===r.id)?._dist??null}
-                  onTap={()=>setSheetReport(r)}/>
-              ))}
-            </div>
-          )}
-
-          {/* Search + filter */}
-          <div style={{padding:"12px 18px 0"}}>
-            <div style={{position:"relative" as const,marginBottom:12}}>
+          {/* Search bar */}
+          <div style={{padding:"12px 18px 8px"}}>
+            <div style={{position:"relative" as const}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{position:"absolute" as const,left:11,top:"50%",transform:"translateY(-50%)",pointerEvents:"none" as const}}>
+                <circle cx="6" cy="6" r="4.5" stroke={th.t4} strokeWidth="1.2"/>
+                <path d="M9.5 9.5L13 13" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px 9px 32px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
               {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:th.t4,fontSize:18,lineHeight:1}}>×</button>}
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap" as const,paddingBottom:4}}>
-              {[{key:"All",label:"All"},...H]
-                .filter((_,i) => pillsExpanded || i < 4)
-                .map(hx=>(
-                  <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                    style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
-                    {hx.label}
-                  </button>
-                ))}
-              <button onClick={()=>setPillsExpanded(p=>!p)}
-                style={{flexShrink:0,background:th.pi,border:`1px solid ${th.pib}`,borderRadius:20,padding:"6px 12px",color:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
-                {pillsExpanded ? "Less" : "More"}
-              </button>
-            </div>
           </div>
 
-          {/* Feed list */}
-          <div style={{padding:"0 18px"}}>
-            <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 8px",marginTop:14}}>
-              <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl}}>NEAREST FIRST</div>
-            </div>
-
-            {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
-
-            {!loading&&(feedReports.length===0
-              ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
-                <div style={{fontSize:44,marginBottom:12,opacity:.15}}>👁️</div>
-                <div style={{color:th.t1,fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
-                <div style={{color:th.t3,fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
-                <button onClick={onReport} style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:14,padding:"14px 28px",color:th.t3,fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
-                  Report a Hazard
+          {/* Filter pills */}
+          <div style={{padding:"0 18px 10px",display:"flex",gap:6,flexWrap:"wrap" as const}}>
+            {[{key:"All",label:"All"},...H]
+              .filter((_,i) => pillsExpanded || i < 4)
+              .map(hx=>(
+                <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
+                  style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
+                  {hx.label}
                 </button>
-              </div>
-              :<>
-                {(feedExpanded ? feedReports : feedReports.slice(0,4)).map((r:any)=>(
-                  <HazardItem key={r.id} r={r} distanceKm={r._dist} isNew={newReportIds.has(r.id)} onTap={()=>setSheetReport(r)}/>
-                ))}
-                {feedReports.length>4&&(
-                  <button onClick={()=>setFeedExpanded(p=>!p)}
-                    style={{width:"100%",background:"none",border:"none",padding:"12px 0",color:th.t3,fontSize:12,fontWeight:700,fontFamily:"inherit",letterSpacing:.3}}>
-                    {feedExpanded ? "Show less" : `Show ${feedReports.length-4} more`}
-                  </button>
-                )}
-              </>
-            )}
-
-            {!loading&&fixedReports.length>0&&(
-              <>
-                <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"14px 0 10px",marginTop:8}}>
-                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl2}}>FIXED RECENTLY</div>
-                </div>
-                {fixedReports.map(r=>(
-                  <HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>
-                ))}
-              </>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {/* ══ ROUTE TAB ══ */}
-      {tab==="route"&&(
-        <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
-          <div style={{marginBottom:20}}>
-            <div style={{color:th.t1,fontWeight:700,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
-            <div style={{color:th.t3,fontSize:13}}>See what citizens have reported along any road.</div>
-          </div>
-
-          <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
-            <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:th.t4,flexShrink:0}}/>
-              <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
-                placeholder="From — e.g. Spintex Road"
-                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:12,padding:"13px 12px 13px 32px",color:th.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
-            </div>
-            <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:th.t4,flexShrink:0}}/>
-              <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
-                placeholder="To — e.g. Tema Motorway"
-                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:12,padding:"13px 12px 13px 32px",color:th.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
-            </div>
-            <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
-              style={{background:routeFrom.trim()&&routeTo.trim()?th.bg3:th.bg2,border:`1px solid ${routeFrom.trim()&&routeTo.trim()?th.b1:th.b1}`,borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?th.t2:th.t4,fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              {checking?<><div style={{width:16,height:16,border:`2px solid ${th.b1}`,borderTopColor:th.t2,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>Check Route</>}
+              ))}
+            <button onClick={()=>setPillsExpanded(p=>!p)}
+              style={{flexShrink:0,background:th.pi,border:`1px solid ${th.pib}`,borderRadius:20,padding:"6px 12px",color:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
+              {pillsExpanded ? "Less" : "More"}
             </button>
           </div>
 
-          {/* Safety score */}
-          {safetyScore!==null&&(
-            <div style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
-              <div style={{textAlign:"center" as const,flexShrink:0}}>
-                <div style={{color:scoreColor(safetyScore),fontSize:28,fontWeight:700,lineHeight:1}}>{safetyScore}</div>
-                <div style={{color:th.t4,fontSize:10,marginTop:1}}>/ 10</div>
-              </div>
-              <div>
-                <div style={{color:scoreColor(safetyScore),fontWeight:700,fontSize:14,letterSpacing:.5}}>{scoreLabel(safetyScore)}</div>
-                <div style={{color:th.t4,fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
-              </div>
-            </div>
-          )}
-
-          {routeResult!==null&&(
-            <div style={{animation:"fadeUp .15s ease"}}>
-              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 8px",marginBottom:4}}>
-                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl}}>
-                  {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} ON THIS ROUTE`}
+          {/* Critical alert banner */}
+          {(()=>{
+            const crit = (routeResult ?? feedReports).find((r:any)=>r.severity==="CRITICAL");
+            if (!crit) return null;
+            const h = hMeta(crit.hazardType);
+            const dist = crit._dist != null ? ` · ${fmtDist(crit._dist)} ahead` : "";
+            return (
+              <div style={{margin:"0 18px 12px"}} onClick={()=>setSheetReport(crit)}>
+                <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.22)",borderRadius:14,padding:"13px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{flexShrink:0}}>
+                    <path d="M9 2L16.5 15H1.5L9 2Z" fill="rgba(239,68,68,0.18)" stroke="#EF4444" strokeWidth="1.3" strokeLinejoin="round"/>
+                    <line x1="9" y1="7" x2="9" y2="11" stroke="#EF4444" strokeWidth="1.3" strokeLinecap="round"/>
+                    <circle cx="9" cy="13" r="0.7" fill="#EF4444"/>
+                  </svg>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,lineHeight:1.3}}>
+                      <span style={{color:"#EF4444"}}>{criticalCount} critical hazard{criticalCount!==1?"s":""}</span>
+                      <span style={{color:th.t2}}> on your route</span>
+                    </div>
+                    <div style={{fontSize:11,color:th.t3,marginTop:2}}>{h.label} on {crit.address||"this road"}{dist}</div>
+                  </div>
+                  <span style={{color:th.t4,fontSize:16}}>›</span>
                 </div>
               </div>
-              {routeResult.length===0
-                ?<div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.15)",borderRadius:14,padding:"28px",textAlign:"center" as const}}>
-                  <div style={{fontSize:36,marginBottom:10}}>✅</div>
-                  <div style={{color:"#22C55E",fontWeight:700,fontSize:16,marginBottom:4}}>Looking clear</div>
-                  <div style={{color:"#888",fontSize:12}}>No citizen reports for these roads right now.</div>
-                </div>
-                :routeResult.map(r=><HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>)
-              }
-            </div>
-          )}
+            );
+          })()}
 
-          {routeResult===null&&!checking&&(
-            <div style={{textAlign:"center" as const,padding:"32px 0",color:th.t4,fontSize:13}}>
-              Enter a start and end point to see citizen reports along that road.
+          {/* Map */}
+          <div style={{height:250,margin:"0 0 14px",position:"relative" as const}}>
+            <MapView reports={routeResult??reports} hazardFilter={hazardFilter} onConfirm={doConfirm} confirmed={confirmed}/>
+          </div>
+
+          {/* ON YOUR ROUTE / NEAR YOU section */}
+          <div style={{padding:"0 18px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="4" cy="4" r="2" stroke={th.t3} strokeWidth="1.2" fill="none"/>
+                  <circle cx="10" cy="10" r="2" stroke={th.t3} strokeWidth="1.2" fill="none"/>
+                  <path d="M4 6c0 2 2 4 6 4" stroke={th.t3} strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <span style={{fontSize:9,fontWeight:800,letterSpacing:2,color:th.t3}}>
+                  {routeResult ? "ON YOUR ROUTE" : "NEAR YOU"}
+                </span>
+              </div>
+              {(routeResult??feedReports).length>3&&(
+                <button onClick={()=>setFeedExpanded(p=>!p)}
+                  style={{background:"none",border:"none",color:"#EF4444",fontSize:12,fontWeight:700,fontFamily:"inherit",display:"flex",alignItems:"center",gap:3}}>
+                  {feedExpanded ? "Less" : "See all"} <span style={{fontSize:14}}>›</span>
+                </button>
+              )}
             </div>
-          )}
+
+            <div style={{background:th.bg2,borderRadius:14,overflow:"hidden",border:`1px solid ${th.b1}`}}>
+              {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
+              {!loading&&(()=>{
+                const items = routeResult ?? feedReports;
+                const shown = feedExpanded ? items : items.slice(0,3);
+                if (shown.length===0) return (
+                  <div style={{padding:"28px",textAlign:"center" as const,color:th.t4,fontSize:13}}>No hazards found.</div>
+                );
+                return shown.map((r:any,i:number)=>(
+                  <button key={r.id} onClick={()=>setSheetReport(r)}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:"none",border:"none",borderBottom:i<shown.length-1?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:r.severity==="CRITICAL"?"#EF4444":r.severity==="HIGH"?"#555":"#333",flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:600,color:th.t1,marginBottom:2}}>{r.address||hMeta(r.hazardType).label}</div>
+                      <div style={{fontSize:11,color:r.severity==="CRITICAL"?"#EF4444":th.t3}}>
+                        {SEV_LABEL[r.severity]} · {hMeta(r.hazardType).label}{r._dist!=null ? ` · ${fmtDist(r._dist)} ahead` : ""}
+                      </div>
+                    </div>
+                    <span style={{color:th.t4,fontSize:16,flexShrink:0}}>›</span>
+                  </button>
+                ));
+              })()}
+            </div>
+
+            {!loading&&fixedReports.length>0&&(
+              <div style={{marginTop:16}}>
+                <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:th.sl2,marginBottom:8}}>FIXED RECENTLY</div>
+                <div style={{background:th.bg2,borderRadius:14,overflow:"hidden",border:`1px solid ${th.b1}`}}>
+                  {fixedReports.slice(0,2).map((r,i)=>(
+                    <button key={r.id} onClick={()=>setSheetReport(r)}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:"none",border:"none",borderBottom:i===0?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer",opacity:0.5}}>
+                      <div style={{width:7,height:7,borderRadius:"50%",border:`1px solid ${th.t4}`,flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:th.t2,textDecoration:"line-through"}}>{hMeta(r.hazardType).label}</div>
+                        <div style={{fontSize:11,color:th.t4}}>{r.address}</div>
+                      </div>
+                      <span style={{color:th.t4,fontSize:16}}>›</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ══ MAP TAB ══ */}
-      {tab==="map"&&(
-        <div style={{position:"fixed" as const,top:113,bottom:72,left:0,right:0}}>
-          {/* Route check bar */}
-          <div style={{position:"absolute" as const,top:0,left:0,right:0,zIndex:10,background:"rgba(5,5,5,0.93)",backdropFilter:"blur(12px)",borderBottom:"1px solid #111",padding:"10px 14px"}}>
-            <div style={{display:"flex",gap:7}}>
-              <div style={{flex:1,position:"relative" as const}}>
-                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#333"}}/>
-                <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
-                  placeholder="From"
-                  style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+      {/* ══ ALERTS TAB ══ */}
+      {tab==="alerts"&&(
+        <div style={{padding:"16px 18px 0",animation:"fadeUp .18s ease"}}>
+          <div style={{color:th.t1,fontWeight:700,fontSize:18,letterSpacing:-.3,marginBottom:4}}>Alerts</div>
+          <div style={{color:th.t3,fontSize:12,marginBottom:16}}>Official announcements and road closures.</div>
+          {visibleAnnouncements.length===0
+            ?<div style={{textAlign:"center" as const,padding:"48px 0",color:th.t4,fontSize:13}}>No alerts right now.</div>
+            :visibleAnnouncements.map(a=>{
+              const isEmergency=a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
+              return(
+                <div key={a.id} style={{background:th.bg2,border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":th.b1}`,borderLeft:`2px solid ${isEmergency?"#EF4444":th.b1}`,borderRadius:12,padding:"13px",marginBottom:10,display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{color:th.t4,fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:3}}>{a.region||"NATIONAL"}</div>
+                    <div style={{color:th.t1,fontWeight:700,fontSize:13,marginBottom:3}}>{a.title}</div>
+                    <div style={{color:th.t3,fontSize:12,lineHeight:1.5}}>{a.body}</div>
+                  </div>
+                  <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))} style={{background:"none",border:"none",color:th.t4,fontSize:20,lineHeight:1,flexShrink:0}}>×</button>
+                </div>
+              );
+            })
+          }
+        </div>
+      )}
+
+      {/* ══ DASHBOARD TAB ══ */}
+      {tab==="dashboard"&&(
+        <div style={{padding:"16px 18px 0",animation:"fadeUp .18s ease"}}>
+          <div style={{color:th.t1,fontWeight:700,fontSize:18,letterSpacing:-.3,marginBottom:16}}>Dashboard</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            {[
+              {label:"Active hazards",  value:activeReports.length,     color:"#EF4444"},
+              {label:"Critical",        value:criticalCount,            color:"#EF4444"},
+              {label:"Fixed recently",  value:fixedReports.length,      color:"#22C55E"},
+              {label:"Total confirmed", value:totalConfirmed,           color:th.t2},
+            ].map(s=>(
+              <div key={s.label} style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:14,padding:"16px"}}>
+                <div style={{fontSize:26,fontWeight:700,color:s.color,lineHeight:1,marginBottom:4}}>{s.value}</div>
+                <div style={{fontSize:11,color:th.t3}}>{s.label}</div>
               </div>
-              <div style={{flex:1,position:"relative" as const}}>
-                <span style={{position:"absolute" as const,left:10,top:"50%",transform:"translateY(-50%)",width:7,height:7,borderRadius:"50%",background:"#333"}}/>
-                <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
-                  placeholder="To"
-                  style={{width:"100%",background:"#111",border:"1px solid #1a1a1a",borderRadius:10,padding:"9px 10px 9px 26px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
-              </div>
-              <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
-                style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:10,padding:"9px 14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#333",fontWeight:700,fontSize:13,fontFamily:"inherit",flexShrink:0}}>
-                {checking?<div style={{width:14,height:14,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>:"🔍"}
-              </button>
-            </div>
-            {/* Safety score on map */}
-            {safetyScore!==null&&(
-              <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{color:scoreColor(safetyScore),fontSize:11,fontWeight:900,letterSpacing:1}}>
-                  {scoreLabel(safetyScore)} · {safetyScore}/10
-                </span>
-                {routeResult&&routeResult.length>0&&(
-                  <span style={{color:"#555",fontSize:10}}>⚠ {routeResult.length} hazard{routeResult.length!==1?"s":""} on route</span>
-                )}
-              </div>
-            )}
-            {safetyScore===null&&routeResult!==null&&(
-              <div style={{marginTop:6,fontSize:10,fontWeight:700,letterSpacing:1.5,color:"#22C55E"}}>
-                ✓ NO HAZARDS ON THIS ROUTE
-              </div>
-            )}
-          </div>
-          {/* Map fills remaining */}
-          <div style={{position:"absolute" as const,top:safetyScore!==null?86:routeResult!==null?72:54,bottom:0,left:0,right:0}}>
-            <MapView
-              reports={routeResult!==null?routeResult:reports}
-              hazardFilter={hazardFilter}
-              onConfirm={doConfirm}
-              confirmed={confirmed}
-            />
-          </div>
-          {/* Filter pills overlay */}
-          <div style={{position:"absolute" as const,bottom:10,left:12,right:0,zIndex:10,display:"flex",gap:5,overflowX:"auto" as const,paddingRight:12}}>
-            {[{key:"All",e:"◈",label:"All"},...H].map(hx=>(
-              <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                style={{flexShrink:0,background:hazardFilter===hx.key?"rgba(255,255,255,0.95)":"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:`1px solid ${hazardFilter===hx.key?"rgba(255,255,255,0.9)":"rgba(255,255,255,0.06)"}`,borderRadius:20,padding:"5px 11px",color:hazardFilter===hx.key?"#000":"#777",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>
-                {hx.e} {hx.label}
-              </button>
             ))}
+          </div>
+          <div style={{background:th.bg2,border:`1px solid ${th.b1}`,borderRadius:14,padding:"16px",marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:th.t3,letterSpacing:.5,marginBottom:12}}>BY TYPE</div>
+            {H.map(hx=>{
+              const count = activeReports.filter(r=>r.hazardType===hx.key).length;
+              const pct   = activeReports.length>0 ? (count/activeReports.length)*100 : 0;
+              return count>0 ? (
+                <div key={hx.key} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <div style={{width:80,fontSize:11,color:th.t2,flexShrink:0}}>{hx.label}</div>
+                  <div style={{flex:1,height:4,background:th.b1,borderRadius:2,overflow:"hidden"}}>
+                    <div style={{width:`${pct}%`,height:"100%",background:"#EF4444",borderRadius:2}}/>
+                  </div>
+                  <div style={{width:20,fontSize:11,color:th.t3,textAlign:"right" as const,flexShrink:0}}>{count}</div>
+                </div>
+              ) : null;
+            })}
           </div>
         </div>
       )}
@@ -1540,6 +1537,15 @@ export default function PublicPage() {
         </div>
       )}
 
+      {/* Destination sheet */}
+      {showDestSheet&&(
+        <DestinationSheet
+          fromVal={routeFrom} toVal={routeTo}
+          onSet={(f,t)=>{ setRouteFrom(f); setRouteTo(t); setTimeout(checkRoute,50); }}
+          onClose={()=>setShowDestSheet(false)}
+        />
+      )}
+
       {/* Settings sheet */}
       {showSettings&&(
         <SettingsSheet theme={themeName} onTheme={onThemeChange} onClose={()=>setShowSettings(false)}/>
@@ -1558,35 +1564,42 @@ export default function PublicPage() {
 
       {/* ── BOTTOM NAV ── */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:th.nav,borderTop:`0.5px solid ${th.navBorder}`,backdropFilter:"blur(20px)"}}>
-        {/* Report button row */}
-        <div style={{padding:"12px 16px 8px"}}>
-          <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
-            style={{width:"100%",background:th.rpBg,border:`1px solid ${th.rpBorder}`,borderRadius:100,padding:"15px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontFamily:"inherit"}}>
-            <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
-              <path d="M7 1L13 12H1L7 1Z" stroke={th.rpText} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
-              <line x1="7" y1="5.5" x2="7" y2="8.5" stroke={th.rpText} strokeWidth="1.2" strokeLinecap="round"/>
-              <circle cx="7" cy="10" r="0.7" fill={th.rpText}/>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"10px 8px 28px"}}>
+          {/* Home */}
+          <button onClick={()=>setTab("home")} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 10px"}}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" stroke={tab==="home"?"#EF4444":th.t4} strokeWidth="1.3" fill={tab==="home"?"#EF4444":"none"} strokeLinejoin="round"/>
+              <path d="M7.5 18V13h5v5" stroke={tab==="home"?"#EF4444":th.t4} strokeWidth="1.3" strokeLinejoin="round"/>
             </svg>
-            <span style={{fontSize:14,fontWeight:600,color:th.rpText,letterSpacing:.2}}>Report a Hazard</span>
+            <span style={{fontSize:8,fontWeight:700,letterSpacing:.5,color:tab==="home"?"#EF4444":th.t4}}>HOME</span>
           </button>
-        </div>
-        {/* Tab row */}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"2px 32px 28px"}}>
-          <button onClick={()=>setTab("feed")} aria-label="Feed"
-            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 12px",opacity:tab==="feed"?1:0.3}}>
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="4.5" width="16" height="1.5" rx="0.75" fill="#888"/>
-              <rect x="2" y="9.25" width="16" height="1.5" rx="0.75" fill="#888"/>
-              <rect x="2" y="14" width="11" height="1.5" rx="0.75" fill="#888"/>
-            </svg>
-            <span style={{fontSize:7,fontWeight:700,letterSpacing:.5,color:"#888"}}>FEED</span>
+          {/* Report */}
+          <button ref={fabRef} onClick={onReport} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 10px"}}>
+            <div style={{width:40,height:40,borderRadius:"50%",background:th.bg2,border:`1px solid ${th.b1}`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:2}}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <line x1="8" y1="3" x2="8" y2="13" stroke={th.t2} strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="3" y1="8" x2="13" y2="8" stroke={th.t2} strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <span style={{fontSize:8,fontWeight:700,letterSpacing:.5,color:th.t4}}>REPORT</span>
           </button>
-          <button onClick={()=>setTab("route")} aria-label="Route"
-            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 12px",opacity:tab==="route"?1:0.3}}>
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M3 16L7 7L11 13L14 9.5L17 16" stroke="#888" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          {/* Alerts */}
+          <button onClick={()=>setTab("alerts")} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 10px"}}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2.5a6 6 0 016 6c0 3 1.5 4.5 1.5 4.5H2.5S4 11.5 4 8.5a6 6 0 016-6z" stroke={tab==="alerts"?"#EF4444":th.t4} strokeWidth="1.3" fill={tab==="alerts"?"rgba(239,68,68,0.15)":"none"}/>
+              <path d="M8 16.5a2 2 0 004 0" stroke={tab==="alerts"?"#EF4444":th.t4} strokeWidth="1.3"/>
+              {visibleAnnouncements.length>0&&<circle cx="15" cy="5" r="3" fill="#EF4444"/>}
             </svg>
-            <span style={{fontSize:7,fontWeight:700,letterSpacing:.5,color:"#888"}}>ROUTE</span>
+            <span style={{fontSize:8,fontWeight:700,letterSpacing:.5,color:tab==="alerts"?"#EF4444":th.t4}}>ALERTS</span>
+          </button>
+          {/* Dashboard */}
+          <button onClick={()=>setTab("dashboard")} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 10px"}}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="12" width="4" height="6" rx="1" fill={tab==="dashboard"?"#EF4444":th.t4}/>
+              <rect x="8" y="8"  width="4" height="10" rx="1" fill={tab==="dashboard"?"#EF4444":th.t4}/>
+              <rect x="14" y="4" width="4" height="14" rx="1" fill={tab==="dashboard"?"#EF4444":th.t4}/>
+            </svg>
+            <span style={{fontSize:8,fontWeight:700,letterSpacing:.5,color:tab==="dashboard"?"#EF4444":th.t4}}>DASHBOARD</span>
           </button>
         </div>
       </div>
