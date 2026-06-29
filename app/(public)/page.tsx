@@ -89,7 +89,7 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 function fmtDist(km: number) {
-  return km < 1 ? `${Math.round(km*1000)}m away` : `${km.toFixed(1)}km away`;
+  return km < 1 ? `${Math.round(km*1000)}m` : `${km.toFixed(1)}km`;
 }
 
 async function revGeo(lat: number, lng: number): Promise<string|null> {
@@ -107,23 +107,18 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-// ─── SKELETON CARD ────────────────────────────────────────────────────────────
-function SkeletonCard() {
+// ─── SKELETON ITEM ────────────────────────────────────────────────────────────
+function SkeletonItem() {
   return (
-    <div style={{background:"#0D0D0D",border:"1px solid #141414",borderRadius:16,overflow:"hidden",marginBottom:12}}>
-      <div style={{height:160,background:"#111",position:"relative" as const,overflow:"hidden"}}>
-        <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.03) 50%,transparent 100%)",animation:"shimmer 1.4s ease-in-out infinite",backgroundSize:"200% 100%"}}/>
-      </div>
-      <div style={{padding:"14px"}}>
-        <div style={{display:"flex",gap:10,marginBottom:14}}>
-          <div style={{width:42,height:42,borderRadius:12,background:"#141414",flexShrink:0}}/>
-          <div style={{flex:1,display:"flex",flexDirection:"column" as const,gap:8,justifyContent:"center"}}>
-            <div style={{height:13,width:"55%",borderRadius:6,background:"#141414"}}/>
-            <div style={{height:10,width:"35%",borderRadius:6,background:"#111"}}/>
-          </div>
-          <div style={{height:20,width:60,borderRadius:20,background:"#141414",alignSelf:"center" as const}}/>
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 0",borderBottom:"0.5px solid #F0F0F0"}}>
+      <div style={{width:7,height:7,borderRadius:"50%",background:"#EBEBEB",flexShrink:0}}/>
+      <div style={{flex:1}}>
+        <div style={{height:12,width:"45%",borderRadius:4,background:"#EBEBEB",marginBottom:6,overflow:"hidden",position:"relative" as const}}>
+          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.7) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
         </div>
-        <div style={{height:40,borderRadius:10,background:"#111"}}/>
+        <div style={{height:10,width:"65%",borderRadius:4,background:"#F0F0F0",overflow:"hidden",position:"relative" as const}}>
+          <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.7) 50%,transparent 100%)",backgroundSize:"200% 100%",animation:"shimmer 1.4s ease-in-out infinite"}}/>
+        </div>
       </div>
     </div>
   );
@@ -438,107 +433,108 @@ function shareWhatsApp(r: any) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
 }
 
-// ─── REPORT CARD ──────────────────────────────────────────────────────────────
-function ReportCard({ r, confirmed, onConfirm, isNew, distanceKm }: { r:any; confirmed:boolean; onConfirm:()=>void; isNew?:boolean; distanceKm?:number|null }) {
-  const h       = hMeta(r.hazardType);
+// ─── HAZARD ITEM ─────────────────────────────────────────────────────────────
+function HazardItem({ r, isNew, distanceKm, onTap }: {
+  r: any; isNew?: boolean; distanceKm?: number|null; onTap: () => void;
+}) {
+  const h      = hMeta(r.hazardType);
+  const sev    = r.severity;
   const isFixed = r.status === "RESOLVED";
-  const color   = SC[r.severity] || "#F59E0B";
 
-  if (isFixed) return (
-    <div style={{background:"#0C0C0C",border:"1px solid rgba(34,197,94,0.15)",borderLeft:"3px solid #22C55E",borderRadius:16,overflow:"hidden",marginBottom:12}}>
-      {r.photoUrl&&<img src={r.photoUrl} alt="" style={{width:"100%",height:72,objectFit:"cover",display:"block",filter:"grayscale(70%) brightness(0.4)"}}/>}
-      <div style={{padding:"13px 14px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-          <div style={{background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:20,padding:"3px 9px",display:"flex",alignItems:"center",gap:4}}>
-            <span style={{fontSize:10}}>✅</span>
-            <span style={{color:"#22C55E",fontWeight:800,fontSize:9,letterSpacing:.8}}>FIXED</span>
-          </div>
-          <span style={{color:"#666",fontSize:12}}>{h.e} {h.label}</span>
-          <span style={{color:"#3a3a3a",fontSize:11,marginLeft:"auto"}}>{ago(r.resolvedAt||r.createdAt)}</span>
-        </div>
-        <div style={{color:"#555",fontSize:12,marginBottom:r.resolutionNote?8:0}}>{r.address}</div>
-        {r.resolutionNote&&(
-          <div style={{background:"#111",borderRadius:10,padding:"9px 12px",color:"#555",fontSize:12,lineHeight:1.6,fontStyle:"italic"}}>
-            "{r.resolutionNote}"
-            {r.fixedBy&&<span style={{color:"#3a3a3a",display:"block",marginTop:3,fontStyle:"normal",fontSize:11}}>— {r.fixedBy}</span>}
-          </div>
-        )}
-        <div style={{color:"#3a3a3a",fontSize:11,marginTop:8}}>👍 {r.upvoteCount||0} citizens confirmed</div>
-      </div>
-    </div>
-  );
+  const dotSize  = sev==="CRITICAL" ? 8 : sev==="HIGH" ? 7 : sev==="MEDIUM" ? 6 : 5;
+  const dotColor = sev==="CRITICAL" ? "#EF4444" : sev==="HIGH" ? "#282828" : sev==="MEDIUM" ? "#181818" : "#888888";
+  const nameSize = sev==="CRITICAL" ? 19 : sev==="HIGH" ? 14 : 12;
+  const nameColor = sev==="CRITICAL" ? "#ABABAB" : sev==="HIGH" ? "#5A5A5A" : "#282828";
+  const subSize  = sev==="CRITICAL" ? 11 : sev==="HIGH" ? 10.5 : 10;
+  const subColor = sev==="CRITICAL" ? "#2E2E2E" : sev==="HIGH" ? "#242424" : "#181818";
+
+  const subtitle = [SEV_LABEL[sev], h.label, distanceKm != null ? fmtDist(distanceKm) : null]
+    .filter(Boolean).join(" · ");
 
   return (
-    <div style={{
-      background:"#0D0D0D",
-      border:`1px solid ${isNew?"rgba(239,68,68,0.3)":"#141414"}`,
-      borderRadius:16, overflow:"hidden", marginBottom:12,
-      animation: isNew ? "newReport .35s ease" : "fadeUp .2s ease",
-      boxShadow: isNew ? "0 0 20px rgba(239,68,68,0.12)" : "none",
+    <button onClick={onTap} style={{
+      display:"flex", alignItems:"flex-start", gap:12,
+      padding:"13px 0",
+      borderTop:"none", borderLeft:"none", borderRight:"none",
+      borderBottom:"0.5px solid #F0F0F0",
+      width:"100%", textAlign:"left" as const, fontFamily:"inherit",
+      cursor:"pointer", background:"none",
+      opacity: isFixed ? 0.22 : 1,
+      animation: isNew ? "newReport .35s ease" : undefined,
     }}>
-      <div style={{position:"relative" as const, height: r.photoUrl ? 190 : 88, overflow:"hidden"}}>
-        {r.photoUrl ? (
-          <>
-            <img src={r.photoUrl} alt={h.label} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-            <div style={{position:"absolute" as const,inset:0,background:"linear-gradient(to top, rgba(8,8,8,0.96) 0%, rgba(8,8,8,0.3) 55%, transparent 100%)"}}/>
-          </>
-        ) : (
-          <div style={{width:"100%",height:"100%",background:"#0D0D0D",display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #141414"}}>
-            <span style={{fontSize:40, opacity:.25}}>{h.e}</span>
-          </div>
-        )}
-        <div style={{position:"absolute" as const,top:10,right:10}}>
-          <span style={{color:r.severity==="CRITICAL"?"#EF4444":"#aaa",fontSize:9,fontWeight:700,background:"rgba(8,8,8,0.88)",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"4px 10px",letterSpacing:.8}}>
-            {SEV_LABEL[r.severity]||r.severity}
-          </span>
+      <div style={{paddingTop:4, flexShrink:0}}>
+        {isFixed
+          ? <div style={{width:dotSize,height:dotSize,borderRadius:"50%",border:"1px solid #181818"}}/>
+          : <div style={{width:dotSize,height:dotSize,borderRadius:"50%",background:dotColor}}/>
+        }
+      </div>
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{fontSize:nameSize,fontWeight:600,color:nameColor,lineHeight:1.25,textDecoration:isFixed?"line-through":"none",marginBottom:3}}>
+          {h.label}
+          {isNew&&<span style={{marginLeft:7,fontSize:8,fontWeight:800,letterSpacing:.8,color:"#EF4444",verticalAlign:"middle"}}>JUST IN</span>}
         </div>
-        {isNew&&(
-          <div style={{position:"absolute" as const,top:10,left:10,background:"#EF4444",borderRadius:20,padding:"4px 9px"}}>
-            <span style={{color:"#fff",fontSize:9,fontWeight:900,letterSpacing:.8}}>JUST IN</span>
-          </div>
-        )}
-        {r.photoUrl&&(
-          <div style={{position:"absolute" as const,bottom:10,left:13,right:48,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:22,flexShrink:0}}>{h.e}</span>
-            <div>
-              <div style={{color:"#fff",fontWeight:800,fontSize:15,lineHeight:1,textShadow:"0 1px 6px rgba(0,0,0,0.9)"}}>{h.label}</div>
-              <div style={{color:"rgba(255,255,255,0.55)",fontSize:11,marginTop:2}}>{r.address}</div>
+        <div style={{fontSize:subSize,color:subColor,lineHeight:1.45}}>
+          {subtitle}{r.address ? ` · ${r.address}` : ""}
+        </div>
+        {sev==="CRITICAL"&&!isFixed&&(
+          <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid #EBEBEB"}}>
+            <div style={{fontSize:10,color:"#ABABAB",lineHeight:1.5}}>
+              {h.label} on {r.address||"this road"}{distanceKm!=null ? ` — ${fmtDist(distanceKm)} from you` : ""}.
             </div>
           </div>
         )}
       </div>
+      <div style={{paddingTop:5,flexShrink:0,color:"#C8C8C8",fontSize:14,lineHeight:1}}>›</div>
+    </button>
+  );
+}
 
-      <div style={{padding:"12px 14px"}}>
-        {!r.photoUrl&&(
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-            <div style={{width:44,height:44,borderRadius:12,background:"#141414",border:"1px solid #1e1e1e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-              {h.e}
-            </div>
-            <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:15}}>{h.label}</div>
-              <div style={{color:"#555",fontSize:12,marginTop:2}}>{r.address}</div>
+// ─── HAZARD SHEET ─────────────────────────────────────────────────────────────
+function HazardSheet({ r, distanceKm, confirmed, onConfirm, onClose }: {
+  r: any; distanceKm?: number|null; confirmed: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+  const h = hMeta(r.hazardType);
+  const sev = r.severity;
+  const dotColor = sev==="CRITICAL" ? "#EF4444" : sev==="HIGH" ? "#282828" : "#181818";
+
+  return (
+    <div style={{position:"fixed" as const,inset:0,zIndex:150}}>
+      <div style={{position:"absolute" as const,inset:0,background:"rgba(0,0,0,0.25)",backdropFilter:"blur(2px)"}} onClick={onClose}/>
+      <div style={{
+        position:"absolute" as const, bottom:0, left:0, right:0,
+        background:"#FFFFFF", borderRadius:"20px 20px 0 0",
+        padding:"0 20px 44px",
+        animation:"slideUp .25s cubic-bezier(.32,.72,0,1)",
+        boxShadow:"0 -4px 40px rgba(0,0,0,0.12)",
+      }}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}>
+          <div style={{width:36,height:4,borderRadius:2,background:"#E0E0E0"}}/>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,fontWeight:700,color:"#1E1E1E"}}>{h.label}</div>
+            <div style={{fontSize:11,color:"#ABABAB",marginTop:2}}>
+              {SEV_LABEL[sev]}{r.address ? ` · ${r.address}` : ""}{distanceKm!=null ? ` · ${fmtDist(distanceKm)}` : ""}
             </div>
           </div>
+          <div style={{fontSize:11,color:"#ABABAB"}}>{ago(r.createdAt)}</div>
+        </div>
+        {r.photoUrl&&(
+          <img src={r.photoUrl} alt="" style={{width:"100%",height:160,objectFit:"cover",borderRadius:12,marginBottom:14}}/>
         )}
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
-          <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:6,padding:"2px 7px",flexShrink:0}}>
-            <span style={{color:r.status==="VERIFIED"?"#fff":"#555",fontSize:9,fontWeight:700,letterSpacing:.5}}>{ST_LABEL[r.status]||r.status}</span>
-          </div>
-          <span style={{color:"#2a2a2a",fontSize:10}}>·</span>
-          <span style={{color:"#555",fontSize:11}}>{ago(r.createdAt)}</span>
-          {distanceKm != null && (
-            <><span style={{color:"#2a2a2a",fontSize:10}}>·</span><span style={{color:distanceKm<2?"#ccc":"#555",fontSize:11,fontWeight:distanceKm<2?700:400}}>{fmtDist(distanceKm)}</span></>
-          )}
+        <div style={{padding:"10px 0",borderTop:"0.5px solid #F0F0F0",marginBottom:16}}>
+          <div style={{fontSize:10,color:"#ABABAB"}}>{r.upvoteCount||0} people confirmed this · {ago(r.createdAt)}</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={onConfirm} disabled={confirmed}
-            style={{flex:1,background:confirmed?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${confirmed?"rgba(34,197,94,0.28)":"rgba(255,255,255,0.06)"}`,borderRadius:10,padding:"12px",color:confirmed?"#22C55E":"#888",fontWeight:700,fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s"}}>
-            {confirmed?<><span style={{fontSize:14}}>✓</span> Confirmed · {r.upvoteCount||0}</>:<><span style={{fontSize:14}}>👍</span> I see this · {r.upvoteCount||0}</>}
-          </button>
-          <button onClick={()=>shareWhatsApp(r)} style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:10,padding:"12px 14px",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Share on WhatsApp">
-            📤
-          </button>
-        </div>
+        <button onClick={onConfirm} disabled={confirmed}
+          style={{
+            width:"100%", background:confirmed?"#F5F5F5":"#1E1E1E",
+            border:"none", borderRadius:12, padding:"15px",
+            color:confirmed?"#ABABAB":"#FFFFFF", fontWeight:700,
+            fontSize:15, fontFamily:"inherit",
+          }}>
+          {confirmed ? "You confirmed this" : "Confirm this hazard"}
+        </button>
       </div>
     </div>
   );
@@ -782,6 +778,7 @@ export default function PublicPage() {
   const [showAuth,      setShowAuth]      = useState(false);
   const [onboarded,     setOnboarded]     = useState(true);
   const [pushEnabled,   setPushEnabled]   = useState(false);
+  const [sheetReport,   setSheetReport]   = useState<any>(null);
   const fabRef   = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -1002,7 +999,7 @@ export default function PublicPage() {
   };
 
   return(
-    <div style={{background:"#0A0A0A",minHeight:"100vh",fontFamily:"'Inter',-apple-system,sans-serif",color:"#fff",paddingBottom:80}}>
+    <div style={{background:"#F9F9F9",minHeight:"100vh",fontFamily:"'Inter',-apple-system,sans-serif",color:"#1E1E1E",paddingBottom:100}}>
       <style>{`
         @keyframes fadeUp    {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp   {from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -1044,130 +1041,117 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:"#080808",borderBottom:"1px solid #111",padding:"12px 18px",position:"sticky" as const,top:0,zIndex:50}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <div>
-            <div style={{color:"#333",fontSize:8,fontWeight:700,letterSpacing:3,marginBottom:1}}>ROADWATCH GH</div>
-            <div style={{color:"#fff",fontWeight:900,fontSize:16,letterSpacing:-.4,lineHeight:1}}>Watch the roads.</div>
+      <div style={{background:"#FFFFFF",borderBottom:"0.5px solid #F0F0F0",padding:"14px 18px",position:"sticky" as const,top:0,zIndex:50,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+        <div>
+          <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:4}}>ROADWATCH</div>
+          <div style={{fontSize:18,fontWeight:400,color:"#ABABAB",lineHeight:1.2,marginBottom:3}}>
+            {activeReports.length} hazard{activeReports.length!==1?"s":""} near you
           </div>
-          {/* Auth */}
-          {user ? (
-            <button onClick={()=>signOut().then(()=>setUser(null))}
-              style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:20,padding:"5px 10px",color:"#666",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
-              {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
-            </button>
-          ) : (
-            <button onClick={()=>setShowAuth(true)}
-              style={{background:"#111",border:"1px solid #222",borderRadius:20,padding:"5px 11px",color:"#888",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
-              Sign in
-            </button>
-          )}
+          <div style={{fontSize:10,color:"#1E1E1E"}}>
+            {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
+          </div>
         </div>
+        {user ? (
+          <button onClick={()=>signOut().then(()=>setUser(null))}
+            style={{background:"#F5F5F5",border:"none",borderRadius:20,padding:"5px 10px",color:"#888",fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3,marginTop:4,flexShrink:0}}>
+            {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
+          </button>
+        ) : (
+          <button onClick={()=>setShowAuth(true)}
+            style={{background:"#F5F5F5",border:"none",borderRadius:20,padding:"5px 11px",color:"#888",fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit",marginTop:4,flexShrink:0}}>
+            Sign in
+          </button>
+        )}
       </div>
 
       {/* ══ FEED TAB ══ */}
       {tab==="feed"&&(
         <div style={{animation:"fadeUp .18s ease"}}>
 
-          <div style={{padding:"14px 18px 0"}}>
-            {/* Nearest warning banner */}
-            {nearestWarning && (
-              <div style={{background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderLeft:"3px solid #EF4444",borderRadius:10,padding:"11px 13px",marginBottom:12}}>
-                <div style={{fontSize:9,fontWeight:900,letterSpacing:1.5,color:"#EF4444",marginBottom:4}}>
-                  {SEV_LABEL[nearestWarning.severity].toUpperCase()} — NEAREST HAZARD
-                </div>
-                <div style={{color:"#e0e0e0",fontWeight:700,fontSize:14,marginBottom:2}}>
-                  {hMeta(nearestWarning.hazardType).label}
-                </div>
-                <div style={{color:"#666",fontSize:12}}>
-                  {nearestWarning.address}
-                  {nearestWarning._dist!==null&&<span style={{color:"#999",fontWeight:600}}> · {fmtDist(nearestWarning._dist)}</span>}
-                </div>
-              </div>
-            )}
-
-            {/* Announcements */}
-            {visibleAnnouncements.length>0&&(
-              <div style={{marginBottom:14}}>
-                {visibleAnnouncements.map(a=>{
-                  const isEmergency = a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
-                  return(
-                    <div key={a.id} style={{background:"#0D0D0D",border:`1px solid ${isEmergency?"rgba(239,68,68,0.2)":"#1a1a1a"}`,borderLeft:`2px solid ${isEmergency?"#EF4444":"#2a2a2a"}`,borderRadius:12,padding:"11px 13px",marginBottom:6,display:"flex",alignItems:"flex-start",gap:8}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                          <span style={{color:"#444",fontSize:9,fontWeight:700,letterSpacing:1}}>{a.region||"NATIONAL"}</span>
-                        </div>
-                        <div style={{color:"#e0e0e0",fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
-                        <div style={{color:"#555",fontSize:11,lineHeight:1.5}}>{a.body}</div>
-                      </div>
-                      <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))}
-                        style={{background:"none",border:"none",color:"#333",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+          {/* Announcements */}
+          {visibleAnnouncements.length>0&&(
+            <div style={{padding:"12px 18px 0"}}>
+              {visibleAnnouncements.map(a=>{
+                const isEmergency=a.type==="EMERGENCY"||a.type==="ROAD_CLOSURE";
+                return(
+                  <div key={a.id} style={{background:"#FFFFFF",border:`0.5px solid ${isEmergency?"rgba(239,68,68,0.2)":"#E8E8E8"}`,borderLeft:`2px solid ${isEmergency?"#EF4444":"#D0D0D0"}`,borderRadius:10,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{color:"#ABABAB",fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:3}}>{a.region||"NATIONAL"}</div>
+                      <div style={{color:"#1E1E1E",fontWeight:700,fontSize:13,marginBottom:2}}>{a.title}</div>
+                      <div style={{color:"#888",fontSize:11,lineHeight:1.5}}>{a.body}</div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* My Reports (signed-in users) */}
-            {user && myReports.length > 0 && (
-              <div style={{marginBottom:16}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                  <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"#444"}}>MY REPORTS · {myReports.length}</div>
-                </div>
-                {myReports.slice(0,3).map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
-                <div style={{height:1,background:"#141414",margin:"16px 0"}}/>
-              </div>
-            )}
-
-            {/* Search */}
-            <div style={{position:"relative" as const,marginBottom:10}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"10px 12px",color:"#ccc",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
-              {search&&<button onClick={()=>setSearch("")}
-                style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#555",fontSize:18,lineHeight:1}}>×</button>}
+                    <button onClick={()=>setDismissed(d=>new Set([...d,a.id]))} style={{background:"none",border:"none",color:"#CCC",fontSize:20,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button>
+                  </div>
+                );
+              })}
             </div>
+          )}
 
-            {/* Hazard filter pills */}
-            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4,marginBottom:16}}>
+          {/* My Reports (signed-in users) */}
+          {user&&myReports.length>0&&(
+            <div style={{padding:"0 18px"}}>
+              <div style={{borderTop:"0.5px solid #E8E8E8",padding:"12px 0 0",marginTop:12}}>
+                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#1A1A1A",marginBottom:4}}>MY REPORTS · {myReports.length}</div>
+              </div>
+              {myReports.slice(0,3).map(r=>(
+                <HazardItem key={r.id} r={r}
+                  distanceKm={feedReports.find((fr:any)=>fr.id===r.id)?._dist??null}
+                  onTap={()=>setSheetReport(r)}/>
+              ))}
+            </div>
+          )}
+
+          {/* Search + filter */}
+          <div style={{padding:"12px 18px 0"}}>
+            <div style={{position:"relative" as const,marginBottom:12}}>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
+                style={{width:"100%",background:"#F5F5F5",border:"none",borderRadius:10,padding:"9px 12px",color:"#1E1E1E",fontSize:13,fontFamily:"inherit",outline:"none"}}/>
+              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#ABABAB",fontSize:18,lineHeight:1}}>×</button>}
+            </div>
+            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4}}>
               {[{key:"All",label:"All"},...H].map(hx=>(
                 <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?"#fff":"#0D0D0D",border:`1px solid ${hazardFilter===hx.key?"#fff":"#1e1e1e"}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#000":"#555",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
+                  style={{flexShrink:0,background:hazardFilter===hx.key?"#1E1E1E":"#F5F5F5",border:"none",borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?"#FFF":"#888",fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
                   {hx.label}
                 </button>
               ))}
             </div>
+          </div>
 
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444"}}>{feedReports.length} REPORTS</div>
+          {/* Feed list */}
+          <div style={{padding:"0 18px"}}>
+            <div style={{borderTop:"0.5px solid #111",padding:"10px 0 8px",marginTop:14}}>
+              <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#1A1A1A"}}>NEAREST FIRST</div>
             </div>
 
-            {loading&&[0,1,2].map(i=><SkeletonCard key={i}/>)}
+            {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
 
             {!loading&&(feedReports.length===0
               ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
-                <div style={{fontSize:44,marginBottom:12,opacity:.6}}>👁️</div>
-                <div style={{color:"#fff",fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
-                <div style={{color:"#666",fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
-                <button onClick={onReport} style={{background:"#EF4444",border:"none",borderRadius:14,padding:"14px 28px",color:"#fff",fontWeight:800,fontSize:14,fontFamily:"inherit"}}>
-                  🚨 Report a Hazard
+                <div style={{fontSize:44,marginBottom:12,opacity:.25}}>👁️</div>
+                <div style={{color:"#1E1E1E",fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
+                <div style={{color:"#ABABAB",fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
+                <button onClick={onReport} style={{background:"#1E1E1E",border:"none",borderRadius:14,padding:"14px 28px",color:"#FFF",fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
+                  Report a Hazard
                 </button>
               </div>
-              :feedReports.map((r:any)=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)} isNew={newReportIds.has(r.id)} distanceKm={r._dist}/>)
+              :feedReports.map((r:any)=>(
+                <HazardItem key={r.id} r={r} distanceKm={r._dist} isNew={newReportIds.has(r.id)} onTap={()=>setSheetReport(r)}/>
+              ))
             )}
 
             {!loading&&fixedReports.length>0&&(
               <>
-                <div style={{display:"flex",alignItems:"center",gap:10,margin:"28px 0 14px"}}>
-                  <div style={{flex:1,height:1,background:"#141414"}}/>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#555"}}>RECENTLY FIXED · {fixedReports.length}</span>
-                  </div>
-                  <div style={{flex:1,height:1,background:"#141414"}}/>
+                <div style={{borderTop:"0.5px solid #E8E8E8",padding:"14px 0 10px",marginTop:8}}>
+                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#ABABAB"}}>FIXED · {fixedReports.length}</div>
                 </div>
-                {fixedReports.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)}
+                {fixedReports.map(r=>(
+                  <HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>
+                ))}
               </>
             )}
           </div>
+
         </div>
       )}
 
@@ -1175,61 +1159,63 @@ export default function PublicPage() {
       {tab==="route"&&(
         <div style={{padding:"20px 18px 0",animation:"fadeUp .18s ease"}}>
           <div style={{marginBottom:20}}>
-            <div style={{color:"#fff",fontWeight:900,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
-            <div style={{color:"#666",fontSize:13}}>See what citizens have reported along any road.</div>
+            <div style={{color:"#1E1E1E",fontWeight:700,fontSize:20,letterSpacing:-.4,marginBottom:4}}>Check a Route</div>
+            <div style={{color:"#ABABAB",fontSize:13}}>See what citizens have reported along any road.</div>
           </div>
 
           <div style={{display:"flex",flexDirection:"column" as const,gap:8,marginBottom:14}}>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#444",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#D0D0D0",flexShrink:0}}/>
               <input value={routeFrom} onChange={e=>setRouteFrom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="From — e.g. Spintex Road"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:"#F5F5F5",border:"none",borderRadius:12,padding:"13px 12px 13px 32px",color:"#1E1E1E",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <div style={{position:"relative" as const}}>
-              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#333",flexShrink:0}}/>
+              <span style={{position:"absolute" as const,left:13,top:"50%",transform:"translateY(-50%)",width:8,height:8,borderRadius:"50%",background:"#D0D0D0",flexShrink:0}}/>
               <input value={routeTo} onChange={e=>setRouteTo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkRoute()}
                 placeholder="To — e.g. Tema Motorway"
-                style={{width:"100%",background:"#0D0D0D",border:"1px solid #1a1a1a",borderRadius:12,padding:"13px 12px 13px 32px",color:"#ccc",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+                style={{width:"100%",background:"#F5F5F5",border:"none",borderRadius:12,padding:"13px 12px 13px 32px",color:"#1E1E1E",fontSize:14,fontFamily:"inherit",outline:"none"}}/>
             </div>
             <button onClick={checkRoute} disabled={checking||!routeFrom.trim()||!routeTo.trim()}
-              style={{background:routeFrom.trim()&&routeTo.trim()?"#EF4444":"#111",border:"none",borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#fff":"#333",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              {checking?<><div style={{width:16,height:16,border:"2px solid #fff4",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>🔍 Check Route</>}
+              style={{background:routeFrom.trim()&&routeTo.trim()?"#1E1E1E":"#F5F5F5",border:"none",borderRadius:12,padding:"14px",color:routeFrom.trim()&&routeTo.trim()?"#FFF":"#ABABAB",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {checking?<><div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.2)",borderTopColor:"#FFF",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Checking…</>:<>Check Route</>}
             </button>
           </div>
 
           {/* Safety score */}
           {safetyScore!==null&&(
-            <div style={{background:`rgba(${safetyScore>=8?"34,197,94":safetyScore>=5?"245,158,11":safetyScore>=3?"249,115,22":"239,68,68"},0.07)`,border:`1px solid rgba(${safetyScore>=8?"34,197,94":safetyScore>=5?"245,158,11":safetyScore>=3?"249,115,22":"239,68,68"},0.2)`,borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{background:"#FFFFFF",border:"0.5px solid #E8E8E8",borderRadius:12,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
               <div style={{textAlign:"center" as const,flexShrink:0}}>
-                <div style={{color:scoreColor(safetyScore),fontSize:28,fontWeight:900,lineHeight:1}}>{safetyScore}</div>
-                <div style={{color:"#555",fontSize:10,marginTop:1}}>/ 10</div>
+                <div style={{color:scoreColor(safetyScore),fontSize:28,fontWeight:700,lineHeight:1}}>{safetyScore}</div>
+                <div style={{color:"#ABABAB",fontSize:10,marginTop:1}}>/ 10</div>
               </div>
               <div>
-                <div style={{color:scoreColor(safetyScore),fontWeight:800,fontSize:14,letterSpacing:.5}}>{scoreLabel(safetyScore)}</div>
-                <div style={{color:"#555",fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
+                <div style={{color:scoreColor(safetyScore),fontWeight:700,fontSize:14,letterSpacing:.5}}>{scoreLabel(safetyScore)}</div>
+                <div style={{color:"#ABABAB",fontSize:12,marginTop:2}}>Route safety score based on citizen reports</div>
               </div>
             </div>
           )}
 
           {routeResult!==null&&(
             <div style={{animation:"fadeUp .15s ease"}}>
-              <div style={{fontSize:9,fontWeight:900,letterSpacing:2,color:"#444",marginBottom:12}}>
-                {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} ON THIS ROUTE`}
+              <div style={{borderTop:"0.5px solid #E8E8E8",padding:"10px 0 8px",marginBottom:4}}>
+                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:"#1A1A1A"}}>
+                  {routeResult.length===0?"NO REPORTS FOUND":`${routeResult.length} REPORT${routeResult.length!==1?"S":""} ON THIS ROUTE`}
+                </div>
               </div>
               {routeResult.length===0
                 ?<div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.15)",borderRadius:14,padding:"28px",textAlign:"center" as const}}>
                   <div style={{fontSize:36,marginBottom:10}}>✅</div>
                   <div style={{color:"#22C55E",fontWeight:700,fontSize:16,marginBottom:4}}>Looking clear</div>
-                  <div style={{color:"#555",fontSize:12}}>No citizen reports for these roads right now.</div>
+                  <div style={{color:"#888",fontSize:12}}>No citizen reports for these roads right now.</div>
                 </div>
-                :routeResult.map(r=><ReportCard key={r.id} r={r} confirmed={!!confirmed[r.id]} onConfirm={()=>doConfirm(r.id)}/>)
+                :routeResult.map(r=><HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>)
               }
             </div>
           )}
 
           {routeResult===null&&!checking&&(
-            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#333",fontSize:13}}>
+            <div style={{textAlign:"center" as const,padding:"32px 0",color:"#ABABAB",fontSize:13}}>
               Enter a start and end point to see citizen reports along that road.
             </div>
           )}
@@ -1299,15 +1285,14 @@ export default function PublicPage() {
 
       {/* PWA install prompt */}
       {showInstall&&(
-        <div style={{position:"fixed" as const,bottom:84,left:12,right:12,zIndex:105,background:"#0D0D0D",border:"1px solid #1e1e1e",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease"}}>
-          <span style={{fontSize:20}}>📲</span>
+        <div style={{position:"fixed" as const,bottom:90,left:12,right:12,zIndex:105,background:"#FFFFFF",border:"0.5px solid #E8E8E8",borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:10,animation:"fadeUp .2s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.08)"}}>
           <div style={{flex:1}}>
-            <div style={{color:"#fff",fontWeight:700,fontSize:13}}>Add to Home Screen</div>
-            <div style={{color:"#666",fontSize:11}}>Works offline · No app store needed</div>
+            <div style={{color:"#1E1E1E",fontWeight:700,fontSize:13}}>Add to Home Screen</div>
+            <div style={{color:"#ABABAB",fontSize:11}}>Works offline · No app store needed</div>
           </div>
           <button onClick={async()=>{installPrompt?.prompt();const r=await installPrompt?.userChoice;if(r?.outcome==="accepted")setShowInstall(false);}}
-            style={{background:"#fff",border:"none",borderRadius:10,padding:"8px 14px",color:"#000",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>Add</button>
-          <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:"#444",fontSize:20,lineHeight:1}}>×</button>
+            style={{background:"#1E1E1E",border:"none",borderRadius:10,padding:"8px 14px",color:"#FFF",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>Add</button>
+          <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:"#ABABAB",fontSize:20,lineHeight:1}}>×</button>
         </div>
       )}
 
@@ -1369,19 +1354,48 @@ export default function PublicPage() {
         </div>
       )}
 
+      {/* Hazard detail sheet */}
+      {sheetReport&&(
+        <HazardSheet
+          r={sheetReport}
+          distanceKm={feedReports.find((fr:any)=>fr.id===sheetReport.id)?._dist??null}
+          confirmed={!!confirmed[sheetReport.id]}
+          onConfirm={()=>{ doConfirm(sheetReport.id); }}
+          onClose={()=>setSheetReport(null)}
+        />
+      )}
+
       {/* ── BOTTOM NAV ── */}
-      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"rgba(8,8,8,0.97)",borderTop:"1px solid #111",backdropFilter:"blur(20px)"}}>
-        <div style={{display:"flex",alignItems:"flex-end",paddingBottom:20}}>
-          <NavBtn tKey="feed" label="Feed"/>
-          <div style={{flex:1,display:"flex",justifyContent:"center",alignItems:"flex-end"}}>
-            <div style={{position:"relative" as const,bottom:14}}>
-              <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard" style={{width:56,height:56,borderRadius:"50%",background:"#EF4444",border:"4px solid #080808",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,animation:"fabPulse 5s ease-in-out infinite"}}>
-                🚨
-              </button>
-              <div style={{textAlign:"center" as const,marginTop:4,fontSize:9,fontWeight:800,letterSpacing:.6,color:"#EF4444",lineHeight:1}}>REPORT</div>
-            </div>
-          </div>
-          <NavBtn tKey="map" label="Map"/>
+      <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:"#FFFFFF",borderTop:"0.5px solid #F0F0F0"}}>
+        <div style={{display:"flex",alignItems:"center",padding:"10px 16px 28px",gap:8}}>
+          {/* Feed tab */}
+          <button onClick={()=>setTab("feed")} aria-label="Feed"
+            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,background:"none",border:"none",fontFamily:"inherit",padding:"6px 14px",opacity:tab==="feed"?1:0.35,flexShrink:0}}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="4.5" width="16" height="1.5" rx="0.75" fill="#1E1E1E"/>
+              <rect x="2" y="9.25" width="16" height="1.5" rx="0.75" fill="#1E1E1E"/>
+              <rect x="2" y="14" width="11" height="1.5" rx="0.75" fill="#1E1E1E"/>
+            </svg>
+            <span style={{fontSize:6.5,fontWeight:700,letterSpacing:.5,color:"#1E1E1E"}}>FEED</span>
+          </button>
+          {/* Report pill */}
+          <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
+            style={{flex:1,background:"#1E1E1E",border:"0.5px solid #2A2A2A",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
+            <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
+              <path d="M7 1L13 12H1L7 1Z" stroke="#666666" strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
+              <line x1="7" y1="5.5" x2="7" y2="8.5" stroke="#666666" strokeWidth="1.2" strokeLinecap="round"/>
+              <circle cx="7" cy="10" r="0.7" fill="#666666"/>
+            </svg>
+            <span style={{fontSize:12,fontWeight:500,color:"#666666",letterSpacing:.2}}>Report a hazard</span>
+          </button>
+          {/* Route tab */}
+          <button onClick={()=>setTab("route")} aria-label="Route"
+            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,background:"none",border:"none",fontFamily:"inherit",padding:"6px 14px",opacity:tab==="route"?1:0.35,flexShrink:0}}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M3 16L7 7L11 13L14 9.5L17 16" stroke="#1E1E1E" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span style={{fontSize:6.5,fontWeight:700,letterSpacing:.5,color:"#1E1E1E"}}>ROUTE</span>
+          </button>
         </div>
       </div>
     </div>
