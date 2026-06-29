@@ -567,8 +567,8 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
   const subSize   = sev==="CRITICAL" ? 11 : sev==="HIGH" ? 10.5 : 10;
   const subColor  = sev==="CRITICAL" ? "var(--hs-c)" : sev==="HIGH" ? "var(--hs-h)" : "var(--hs-m)";
 
-  const subtitle = [SEV_LABEL[sev], distanceKm != null ? fmtDist(distanceKm) : null, r.address]
-    .filter(Boolean).join(" · ");
+  const distStr  = distanceKm != null ? `${fmtDist(distanceKm)} ahead` : null;
+  const subtitle = [SEV_LABEL[sev], r.address, distStr].filter(Boolean).join(" · ");
 
   return (
     <button onClick={onTap} style={{
@@ -595,6 +595,14 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
         <div style={{fontSize:subSize,color:subColor,lineHeight:1.45}}>
           {subtitle}
         </div>
+        {sev==="CRITICAL"&&!isFixed&&(
+          <div style={{marginTop:7,paddingTop:7,borderTop:"0.5px solid var(--hsep)",fontSize:12,lineHeight:1.55}}>
+            <span style={{fontWeight:700,color:"var(--hn-c)"}}>Avoid this road. </span>
+            <span style={{color:"var(--hblrb)"}}>
+              {r.upvoteCount>1 ? `${r.upvoteCount} confirmed.` : "Use extreme caution."}
+            </span>
+          </div>
+        )}
       </div>
       <div style={{paddingTop:5,flexShrink:0,color:"var(--hchev)",fontSize:14,lineHeight:1}}>›</div>
     </button>
@@ -1183,34 +1191,35 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"14px 18px",position:"sticky" as const,top:0,zIndex:50,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-        <div>
-          <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444",marginBottom:4}}>ROADWATCH</div>
-          <div style={{fontSize:18,fontWeight:400,color:th.t3,lineHeight:1.2,marginBottom:3}}>
-            {activeReports.length} hazard{activeReports.length!==1?"s":""} near you
-          </div>
-          <div style={{fontSize:10,color:th.t4}}>
-            {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
+      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"16px 18px 14px",position:"sticky" as const,top:0,zIndex:50}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444"}}>ROADWATCH</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {user ? (
+              <button onClick={()=>signOut().then(()=>setUser(null))}
+                style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>
+                {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
+              </button>
+            ) : (
+              <button onClick={()=>setShowAuth(true)}
+                style={{background:"none",border:"none",color:th.t4,fontSize:10,fontWeight:600,fontFamily:"inherit"}}>
+                Sign in
+              </button>
+            )}
+            <button onClick={()=>setShowSettings(true)} aria-label="Settings"
+              style={{background:"none",border:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t4} strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            </button>
           </div>
         </div>
-        <div style={{display:"flex",gap:6,alignItems:"center",marginTop:4,flexShrink:0}}>
-          {user ? (
-            <button onClick={()=>signOut().then(()=>setUser(null))}
-              style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,padding:"5px 10px",color:th.t3,fontSize:10,fontWeight:600,fontFamily:"inherit",letterSpacing:.3}}>
-              {user.email?.split("@")[0] || user.phone?.slice(-4) || "ME"} · out
-            </button>
-          ) : (
-            <button onClick={()=>setShowAuth(true)}
-              style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,padding:"5px 11px",color:th.t3,fontSize:10,fontWeight:600,letterSpacing:.3,fontFamily:"inherit"}}>
-              Sign in
-            </button>
-          )}
-          <button onClick={()=>setShowSettings(true)} aria-label="Settings"
-            style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:20,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1v1.2M7 11.8V13M1 7h1.2M11.8 7H13M2.93 2.93l.85.85M10.22 10.22l.85.85M10.22 3.78l-.85.85M3.78 10.22l-.85.85" stroke={th.t3} strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-          </button>
+        <div style={{fontSize:28,fontWeight:700,color:th.t1,lineHeight:1.1,letterSpacing:-.5,marginBottom:5}}>
+          {activeReports.length} hazard{activeReports.length!==1?"s":""}
+          <br/>near you
+        </div>
+        <div style={{fontSize:11,color:th.t3}}>
+          {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
         </div>
       </div>
 
@@ -1293,7 +1302,7 @@ export default function PublicPage() {
             {!loading&&fixedReports.length>0&&(
               <>
                 <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"14px 0 10px",marginTop:8}}>
-                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl2}}>FIXED · {fixedReports.length}</div>
+                  <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl2}}>FIXED RECENTLY</div>
                 </div>
                 {fixedReports.map(r=>(
                   <HazardItem key={r.id} r={r} distanceKm={null} onTap={()=>setSheetReport(r)}/>
@@ -1524,34 +1533,35 @@ export default function PublicPage() {
 
       {/* ── BOTTOM NAV ── */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,zIndex:99,background:th.nav,borderTop:`0.5px solid ${th.navBorder}`,backdropFilter:"blur(20px)"}}>
-        <div style={{display:"flex",alignItems:"center",padding:"10px 16px 28px",gap:8}}>
-          {/* Feed tab */}
-          <button onClick={()=>setTab("feed")} aria-label="Feed"
-            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,background:"none",border:"none",fontFamily:"inherit",padding:"6px 14px",opacity:tab==="feed"?1:0.35,flexShrink:0}}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="4.5" width="16" height="1.5" rx="0.75" fill="#888"/>
-              <rect x="2" y="9.25" width="16" height="1.5" rx="0.75" fill="#888"/>
-              <rect x="2" y="14" width="11" height="1.5" rx="0.75" fill="#888"/>
-            </svg>
-            <span style={{fontSize:6.5,fontWeight:700,letterSpacing:.5,color:"#888"}}>FEED</span>
-          </button>
-          {/* Report pill */}
+        {/* Report button row */}
+        <div style={{padding:"12px 16px 8px"}}>
           <button ref={fabRef} onClick={onReport} aria-label="Report a road hazard"
-            style={{flex:1,background:"transparent",border:"none",borderRadius:100,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit"}}>
+            style={{width:"100%",background:th.rpBg,border:`1px solid ${th.rpBorder}`,borderRadius:100,padding:"15px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontFamily:"inherit"}}>
             <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
               <path d="M7 1L13 12H1L7 1Z" stroke={th.rpText} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
               <line x1="7" y1="5.5" x2="7" y2="8.5" stroke={th.rpText} strokeWidth="1.2" strokeLinecap="round"/>
               <circle cx="7" cy="10" r="0.7" fill={th.rpText}/>
             </svg>
-            <span style={{fontSize:12,fontWeight:500,color:th.rpText,letterSpacing:.2}}>Report a hazard</span>
+            <span style={{fontSize:14,fontWeight:600,color:th.rpText,letterSpacing:.2}}>Report a Hazard</span>
           </button>
-          {/* Route tab */}
+        </div>
+        {/* Tab row */}
+        <div style={{display:"flex",justifyContent:"space-between",padding:"2px 32px 28px"}}>
+          <button onClick={()=>setTab("feed")} aria-label="Feed"
+            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 12px",opacity:tab==="feed"?1:0.3}}>
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="4.5" width="16" height="1.5" rx="0.75" fill="#888"/>
+              <rect x="2" y="9.25" width="16" height="1.5" rx="0.75" fill="#888"/>
+              <rect x="2" y="14" width="11" height="1.5" rx="0.75" fill="#888"/>
+            </svg>
+            <span style={{fontSize:7,fontWeight:700,letterSpacing:.5,color:"#888"}}>FEED</span>
+          </button>
           <button onClick={()=>setTab("route")} aria-label="Route"
-            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,background:"none",border:"none",fontFamily:"inherit",padding:"6px 14px",opacity:tab==="route"?1:0.35,flexShrink:0}}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:3,background:"none",border:"none",fontFamily:"inherit",padding:"4px 12px",opacity:tab==="route"?1:0.3}}>
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
               <path d="M3 16L7 7L11 13L14 9.5L17 16" stroke="#888" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <span style={{fontSize:6.5,fontWeight:700,letterSpacing:.5,color:"#888"}}>ROUTE</span>
+            <span style={{fontSize:7,fontWeight:700,letterSpacing:.5,color:"#888"}}>ROUTE</span>
           </button>
         </div>
       </div>
