@@ -28,14 +28,15 @@ function timeAgo(iso: string) {
 }
 
 interface Props {
-  reports:      any[];
-  hazardFilter: string;
-  onConfirm:    (id: string) => void;
-  confirmed:    Record<string, boolean>;
-  lockView?:    boolean;
+  reports:       any[];
+  hazardFilter:  string;
+  onConfirm:     (id: string) => void;
+  confirmed:     Record<string, boolean>;
+  lockView?:     boolean;
+  routeGeometry?: [number,number][] | null;
 }
 
-export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView }: Props) {
+export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView, routeGeometry }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<maplibregl.Map | null>(null);
   const [ready,      setReady]  = useState(false);
@@ -53,7 +54,9 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
-      style:              "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      style: process.env.NEXT_PUBLIC_MAPTILER_KEY
+        ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`
+        : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center:             [-0.187, 5.604],
       zoom:               13,
       attributionControl: false,
@@ -234,26 +237,31 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       map.on("mouseleave", "unclustered-point", () => { map.getCanvas().style.cursor = ""; });
     }
 
-    // Draw route line through visible points (sorted by distance if available)
-    const routeSrc = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
-    if (routeSrc && visible.length >= 2) {
-      const coords = [...visible]
-        .sort((a, b) => (a._dist ?? 0) - (b._dist ?? 0))
-        .map(r => [r.longitude, r.latitude] as [number, number]);
-      routeSrc.setData({
-        type: "FeatureCollection",
-        features: [{ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }],
-      });
-    } else if (routeSrc) {
-      routeSrc.setData({ type: "FeatureCollection", features: [] });
-    }
-
     if (!lockView && visible.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
       visible.forEach(r => bounds.extend([r.longitude, r.latitude]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 14, minZoom: 12, duration: 600 });
     }
   }, [ready, reports, hazardFilter, lockView]);
+
+  // Draw real OSRM route geometry when it changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const src = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    if (routeGeometry && routeGeometry.length >= 2) {
+      src.setData({
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry: { type: "LineString", coordinates: routeGeometry }, properties: {} }],
+      });
+      const bounds = new maplibregl.LngLatBounds();
+      routeGeometry.forEach(c => bounds.extend(c));
+      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 700 });
+    } else {
+      src.setData({ type: "FeatureCollection", features: [] });
+    }
+  }, [ready, routeGeometry]);
 
   // Fallback when WebGL or tiles unavailable
   if (!webGLOk || mapError) {

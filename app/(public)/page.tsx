@@ -935,6 +935,7 @@ export default function PublicPage() {
   const [routeFrom,     setRouteFrom]     = useState("");
   const [routeTo,       setRouteTo]       = useState("");
   const [routeResult,   setRouteResult]   = useState<any[]|null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<[number,number][]|null>(null);
   const [safetyScore,   setSafetyScore]   = useState<number|null>(null);
   const [checking,      setChecking]      = useState(false);
   const [loading,       setLoading]       = useState(true);
@@ -1122,10 +1123,19 @@ export default function PublicPage() {
     await fetch(`/api/reports/${id}/upvote`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fingerprint:`fp-${Date.now()}-${Math.random()}`})});
   };
 
+  const geocode=async(place:string)=>{
+    try {
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place+", Ghana")}&format=json&limit=1`,{headers:{"Accept-Language":"en"}});
+      const d=await r.json();
+      if(d[0]) return [parseFloat(d[0].lon),parseFloat(d[0].lat)] as [number,number];
+    } catch {}
+    return null;
+  };
+
   const checkRoute=async()=>{
     if(!routeFrom.trim()||!routeTo.trim()) return;
-    setChecking(true); setRouteResult(null); setSafetyScore(null);
-    await new Promise(r=>setTimeout(r,500));
+    setChecking(true); setRouteResult(null); setSafetyScore(null); setRouteGeometry(null);
+
     const terms=[routeFrom,routeTo].map(s=>s.toLowerCase());
     const hits=reports
       .filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED")
@@ -1136,7 +1146,22 @@ export default function PublicPage() {
     const high = hits.filter(r=>r.severity==="HIGH").length;
     const med  = hits.filter(r=>r.severity==="MEDIUM").length;
     setSafetyScore(Math.max(0, 10 - (crit*3 + high*2 + med*1)));
-    setRouteResult(hits); setChecking(false);
+    setRouteResult(hits);
+
+    // Fetch real road route from OSRM (free, no key)
+    const [fromCoord, toCoord] = await Promise.all([geocode(routeFrom), geocode(routeTo)]);
+    if(fromCoord && toCoord) {
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${fromCoord[0]},${fromCoord[1]};${toCoord[0]},${toCoord[1]}?geometries=geojson&overview=full`
+        );
+        const data = await res.json();
+        if(data.routes?.[0]?.geometry?.coordinates) {
+          setRouteGeometry(data.routes[0].geometry.coordinates);
+        }
+      } catch {}
+    }
+    setChecking(false);
   };
 
   // ── Theme helper ──
@@ -1291,7 +1316,7 @@ export default function PublicPage() {
 
           {/* Map — edge to edge */}
           <div style={{height:300,margin:"14px 0 0",position:"relative" as const}}>
-            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView/>
+            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView routeGeometry={routeGeometry}/>
           </div>
 
           {/* ON YOUR ROUTE section */}
