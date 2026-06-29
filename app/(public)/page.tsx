@@ -573,7 +573,7 @@ function HazardItem({ r, isNew, distanceKm, onTap }: {
   return (
     <button onClick={onTap} style={{
       display:"flex", alignItems:"flex-start", gap:12,
-      padding:"13px 0",
+      padding:"11px 0",
       borderTop:"none", borderLeft:"none", borderRight:"none",
       borderBottom:"0.5px solid var(--hsep)",
       width:"100%", textAlign:"left" as const, fontFamily:"inherit",
@@ -1191,8 +1191,8 @@ export default function PublicPage() {
       {toast&&<Toast msg={toast} onDismiss={dismissToast}/>}
 
       {/* ── HEADER ── */}
-      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"16px 18px 14px",position:"sticky" as const,top:0,zIndex:50}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+      <div style={{background:th.bg,borderBottom:`0.5px solid ${th.b2}`,padding:"12px 18px 10px",position:"sticky" as const,top:0,zIndex:50}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
           <div style={{fontSize:9,fontWeight:800,letterSpacing:3,color:"#EF4444"}}>ROADWATCH</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             {user ? (
@@ -1214,11 +1214,11 @@ export default function PublicPage() {
             </button>
           </div>
         </div>
-        <div style={{fontSize:28,fontWeight:700,color:th.t1,lineHeight:1.1,letterSpacing:-.5,marginBottom:5}}>
+        <div style={{fontSize:24,fontWeight:700,color:th.t1,lineHeight:1.1,letterSpacing:-.5,marginBottom:3}}>
           {activeReports.length} hazard{activeReports.length!==1?"s":""}
           <br/>near you
         </div>
-        <div style={{fontSize:11,color:th.t3}}>
+        <div style={{fontSize:10,color:th.t3}}>
           {gps.status==="live" ? gps.address : "Greater Accra, Ghana"}
         </div>
       </div>
@@ -1249,8 +1249,8 @@ export default function PublicPage() {
           {/* My Reports (signed-in users) */}
           {user&&myReports.length>0&&(
             <div style={{padding:"0 18px"}}>
-              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"12px 0 0",marginTop:12}}>
-                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl,marginBottom:4}}>MY REPORTS · {myReports.length}</div>
+              <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"8px 0 0",marginTop:8}}>
+                <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl,marginBottom:2}}>MY REPORTS · {myReports.length}</div>
               </div>
               {myReports.slice(0,3).map(r=>(
                 <HazardItem key={r.id} r={r}
@@ -1260,39 +1260,14 @@ export default function PublicPage() {
             </div>
           )}
 
-          {/* Search + filter */}
-          <div style={{padding:"12px 18px 0"}}>
-            <div style={{position:"relative" as const,marginBottom:12}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search road or area…"
-                style={{width:"100%",background:th.inputBg,border:`1px solid ${th.inputBorder}`,borderRadius:10,padding:"9px 12px",color:th.t1,fontSize:13,fontFamily:"inherit",outline:"none"}}/>
-              {search&&<button onClick={()=>setSearch("")} style={{position:"absolute" as const,right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:th.t4,fontSize:18,lineHeight:1}}>×</button>}
-            </div>
-            <div style={{display:"flex",gap:6,overflowX:"auto" as const,paddingBottom:4}}>
-              {[{key:"All",label:"All"},...H].map(hx=>(
-                <button key={hx.key} onClick={()=>setHazardFilter(hx.key)}
-                  style={{flexShrink:0,background:hazardFilter===hx.key?th.pa:th.pi,border:`1px solid ${hazardFilter===hx.key?th.pa:th.pib}`,borderRadius:20,padding:"6px 12px",color:hazardFilter===hx.key?th.pat:th.pit,fontSize:11,fontWeight:700,fontFamily:"inherit",transition:"all .15s"}}>
-                  {hx.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Feed list */}
           <div style={{padding:"0 18px"}}>
-            <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 8px",marginTop:14}}>
-              <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl}}>NEAREST FIRST</div>
-            </div>
-
             {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
 
             {!loading&&(feedReports.length===0
               ?<div style={{textAlign:"center" as const,padding:"52px 0"}}>
-                <div style={{fontSize:44,marginBottom:12,opacity:.15}}>👁️</div>
                 <div style={{color:th.t1,fontWeight:700,fontSize:16,marginBottom:6}}>No reports yet</div>
-                <div style={{color:th.t3,fontSize:13,marginBottom:24}}>Be the first watchdog on Ghana's roads.</div>
-                <button onClick={onReport} style={{background:th.bg3,border:`1px solid ${th.b1}`,borderRadius:14,padding:"14px 28px",color:th.t3,fontWeight:700,fontSize:14,fontFamily:"inherit"}}>
-                  Report a Hazard
-                </button>
+                <div style={{color:th.t3,fontSize:13,marginBottom:24}}>Be the first to report a hazard.</div>
               </div>
               :feedReports.map((r:any)=>(
                 <HazardItem key={r.id} r={r} distanceKm={r._dist} isNew={newReportIds.has(r.id)} onTap={()=>setSheetReport(r)}/>
@@ -1301,7 +1276,7 @@ export default function PublicPage() {
 
             {!loading&&fixedReports.length>0&&(
               <>
-                <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"14px 0 10px",marginTop:8}}>
+                <div style={{borderTop:`0.5px solid ${th.b1}`,padding:"10px 0 6px",marginTop:4}}>
                   <div style={{fontSize:8,fontWeight:800,letterSpacing:2,color:th.sl2}}>FIXED RECENTLY</div>
                 </div>
                 {fixedReports.map(r=>(
