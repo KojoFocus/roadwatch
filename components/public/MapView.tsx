@@ -37,12 +37,13 @@ interface Props {
 }
 
 export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView, routeGeometry }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<maplibregl.Map | null>(null);
-  const [ready,      setReady]  = useState(false);
-  const [selected,   setSelected]   = useState<any | null>(null);
-  const [webGLOk,    setWebGLOk]    = useState(true);
-  const [mapError,   setMapError]   = useState(false);
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const mapRef         = useRef<maplibregl.Map | null>(null);
+  const confirmedMarkers = useRef<maplibregl.Marker[]>([]);
+  const [ready,      setReady]    = useState(false);
+  const [selected,   setSelected] = useState<any | null>(null);
+  const [webGLOk,    setWebGLOk]  = useState(true);
+  const [mapError,   setMapError] = useState(false);
 
   // Init map once
   useEffect(() => {
@@ -86,7 +87,12 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
     });
 
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      confirmedMarkers.current.forEach(m => m.remove());
+      confirmedMarkers.current = [];
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
   // Update GeoJSON source and layers when data or filter changes
@@ -118,6 +124,20 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
         },
       })),
     };
+
+    // ── Confirmed pulse markers (HTML, CSS animated) ──────────────────────────
+    confirmedMarkers.current.forEach(m => m.remove());
+    confirmedMarkers.current = [];
+    visible.filter(r => (r.upvoteCount || 0) >= 3).forEach(r => {
+      const el = document.createElement("div");
+      el.className = "rw-confirmed-pin";
+      el.innerHTML = `<div class="rw-pulse-ring"></div><div class="rw-pulse-dot"></div>`;
+      el.addEventListener("click", e => { e.stopPropagation(); setSelected(r); });
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        .setLngLat([r.longitude, r.latitude])
+        .addTo(map);
+      confirmedMarkers.current.push(marker);
+    });
 
     const src = map.getSource("hazards") as maplibregl.GeoJSONSource | undefined;
     if (src) {
@@ -237,6 +257,11 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       map.on("mouseleave", "unclustered-point", () => { map.getCanvas().style.cursor = ""; });
     }
 
+    // Always exclude confirmed pins from circle layer (they have HTML markers)
+    if (map.getLayer("unclustered-point")) {
+      map.setFilter("unclustered-point", ["all", ["!", ["has", "point_count"]], ["<", ["get", "upvoteCount"], 3]]);
+    }
+
     if (!lockView && visible.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
       visible.forEach(r => bounds.extend([r.longitude, r.latitude]));
@@ -304,11 +329,15 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       <div ref={containerRef} style={{ width:"100%", height:"100%" }} aria-label="Interactive hazard map of Greater Accra" role="application"/>
 
       <style>{`
-        .maplibregl-ctrl-top-right  { top: 8px !important; right: 8px !important; }
+        .maplibregl-ctrl-top-right   { top: 8px !important; right: 8px !important; }
         .maplibregl-ctrl-bottom-left { bottom: 4px !important; left: 4px !important; }
-        .maplibregl-ctrl-attrib { font-size: 9px !important; }
-        .maplibregl-ctrl button { width: 30px !important; height: 30px !important; }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .maplibregl-ctrl-attrib      { font-size: 9px !important; }
+        .maplibregl-ctrl button      { width: 30px !important; height: 30px !important; }
+        @keyframes fadeUp   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes rwPulse  { 0%{transform:translate(-50%,-50%) scale(1);opacity:.7} 100%{transform:translate(-50%,-50%) scale(3.2);opacity:0} }
+        .rw-confirmed-pin   { position:relative; width:20px; height:20px; cursor:pointer; }
+        .rw-pulse-dot       { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:#EF4444; border:2.5px solid #fff; box-shadow:0 0 6px rgba(239,68,68,.6); z-index:2; }
+        .rw-pulse-ring      { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:rgba(239,68,68,.45); animation:rwPulse 1.8s ease-out infinite; }
       `}</style>
 
       {/* Selected report card */}
