@@ -1136,30 +1136,45 @@ export default function PublicPage() {
     if(!routeFrom.trim()||!routeTo.trim()) return;
     setChecking(true); setRouteResult(null); setSafetyScore(null); setRouteGeometry(null);
 
-    const terms=[routeFrom,routeTo].map(s=>s.toLowerCase());
-    const hits=reports
-      .filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED")
-      .filter(r=>terms.some(t=>[(r.address||"").toLowerCase(),(r.landmark||"").toLowerCase(),(r.region||"").toLowerCase()].some(f=>f.includes(t))))
-      .sort((a,b)=>SO[a.severity]-SO[b.severity]);
-
-    const crit = hits.filter(r=>r.severity==="CRITICAL").length;
-    const high = hits.filter(r=>r.severity==="HIGH").length;
-    const med  = hits.filter(r=>r.severity==="MEDIUM").length;
-    setSafetyScore(Math.max(0, 10 - (crit*3 + high*2 + med*1)));
-    setRouteResult(hits);
-
-    // Fetch real road route from OSRM (free, no key)
     const [fromCoord, toCoord] = await Promise.all([geocode(routeFrom), geocode(routeTo)]);
-    if(fromCoord && toCoord) {
-      try {
-        const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${fromCoord[0]},${fromCoord[1]};${toCoord[0]},${toCoord[1]}?geometries=geojson&overview=full`
-        );
-        const data = await res.json();
-        if(data.routes?.[0]?.geometry?.coordinates) {
-          setRouteGeometry(data.routes[0].geometry.coordinates);
-        }
-      } catch {}
+
+    if(!fromCoord || !toCoord) {
+      // Fallback: keyword match against existing reports if geocoding fails
+      const terms=[routeFrom,routeTo].map(s=>s.toLowerCase());
+      const hits=reports
+        .filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED")
+        .filter(r=>terms.some(t=>[(r.address||"").toLowerCase(),(r.landmark||"").toLowerCase(),(r.region||"").toLowerCase()].some(f=>f.includes(t))))
+        .sort((a,b)=>SO[a.severity]-SO[b.severity]);
+      setRouteResult(hits);
+      const crit=hits.filter(r=>r.severity==="CRITICAL").length, high=hits.filter(r=>r.severity==="HIGH").length, med=hits.filter(r=>r.severity==="MEDIUM").length;
+      setSafetyScore(Math.max(0, 10-(crit*3+high*2+med)));
+      setChecking(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/route-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: fromCoord, to: toCoord }),
+      });
+      const data = await res.json();
+
+      if(data.route?.geometry?.coordinates) setRouteGeometry(data.route.geometry.coordinates);
+
+      const hits = (data.hazards||[]).map((r:any)=>({
+        ...r,
+        _dist: haversine(fromCoord[1], fromCoord[0], r.latitude, r.longitude),
+      }));
+      setRouteResult(hits);
+
+      const crit=hits.filter((r:any)=>r.severity==="CRITICAL").length;
+      const high=hits.filter((r:any)=>r.severity==="HIGH").length;
+      const med =hits.filter((r:any)=>r.severity==="MEDIUM").length;
+      setSafetyScore(Math.max(0, 10-(crit*3+high*2+med)));
+    } catch {
+      setRouteResult([]);
+      setSafetyScore(10);
     }
     setChecking(false);
   };
