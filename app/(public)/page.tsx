@@ -1291,7 +1291,7 @@ export default function PublicPage() {
 
           {/* Map — edge to edge */}
           <div style={{height:300,margin:"14px 0 0",position:"relative" as const}}>
-            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed}/>
+            <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView/>
           </div>
 
           {/* ON YOUR ROUTE section */}

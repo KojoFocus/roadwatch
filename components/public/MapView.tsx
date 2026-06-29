@@ -32,10 +32,10 @@ interface Props {
   hazardFilter: string;
   onConfirm:    (id: string) => void;
   confirmed:    Record<string, boolean>;
-  showRoute?:   boolean;
+  lockView?:    boolean;
 }
 
-export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, showRoute }: Props) {
+export default function PublicMapView({ reports, hazardFilter, onConfirm, confirmed, lockView }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<maplibregl.Map | null>(null);
   const [ready,      setReady]  = useState(false);
@@ -60,8 +60,23 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("load",  () => setReady(true));
+    map.on("load", () => {
+      setReady(true);
+      // Center on user's actual location and add a pulsing dot
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const { longitude, latitude } = pos.coords;
+          map.flyTo({ center: [longitude, latitude], zoom: 13, duration: 800 });
+          const el = document.createElement("div");
+          el.style.cssText = [
+            "width:16px","height:16px","border-radius:50%",
+            "background:#EF4444","border:3px solid #fff",
+            "box-shadow:0 0 0 4px rgba(239,68,68,0.25)",
+          ].join(";");
+          new maplibregl.Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+        }, () => {});
+      }
+    });
     map.on("click", () => setSelected(null));
     map.on("error", (e: any) => {
       if (e?.error?.message?.includes("tiles") || e?.error?.status === 0) setMapError(true);
@@ -233,12 +248,12 @@ export default function PublicMapView({ reports, hazardFilter, onConfirm, confir
       routeSrc.setData({ type: "FeatureCollection", features: [] });
     }
 
-    if (visible.length > 1) {
+    if (!lockView && visible.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
       visible.forEach(r => bounds.extend([r.longitude, r.latitude]));
       map.fitBounds(bounds, { padding: 80, maxZoom: 14, minZoom: 12, duration: 600 });
     }
-  }, [ready, reports, hazardFilter]);
+  }, [ready, reports, hazardFilter, lockView]);
 
   // Fallback when WebGL or tiles unavailable
   if (!webGLOk || mapError) {
