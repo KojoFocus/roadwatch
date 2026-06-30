@@ -1322,15 +1322,16 @@ export default function PublicPage() {
 
           {/* ── Route Warning Banner ── */}
           {(()=>{
-            const crit=(routeResult??feedReports).find((r:any)=>r.severity==="CRITICAL");
+            const pool=(routeResult??feedReports);
+            const crit=pool.find((r:any)=>r.severity==="CRITICAL");
             if(!crit) return null;
             const h=hMeta(crit.hazardType);
             const dist=crit._dist!=null?` · ${fmtDist(crit._dist)} ahead`:"";
+            const routeCritCount=pool.filter((r:any)=>r.severity==="CRITICAL").length;
             return(
               <div style={{padding:"12px 18px 0"}}>
-                {/* Main critical banner */}
                 <div onClick={()=>setSheetReport(crit)}
-                  style={{background:"rgba(100,20,20,0.55)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:altRouteGeometry?"16px 16px 0 0":16,padding:"15px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+                  style={{background:"rgba(100,20,20,0.55)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:16,padding:"15px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
                   <svg width="22" height="20" viewBox="0 0 22 20" fill="none" style={{flexShrink:0}}>
                     <path d="M11 1L21 19H1L11 1Z" fill="#F59E0B" stroke="#F59E0B" strokeWidth="0.5" strokeLinejoin="round"/>
                     <line x1="11" y1="8" x2="11" y2="13" stroke="#1a0808" strokeWidth="2" strokeLinecap="round"/>
@@ -1338,32 +1339,13 @@ export default function PublicPage() {
                   </svg>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:700,lineHeight:1.3,marginBottom:3}}>
-                      <span style={{color:"#EF4444"}}>{criticalCount} critical hazard{criticalCount!==1?"s":""}</span>
+                      <span style={{color:"#EF4444"}}>{routeCritCount} critical hazard{routeCritCount!==1?"s":""}</span>
                       <span style={{color:"#fff"}}> on your route</span>
                     </div>
                     <div style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>{h.label} on {crit.address||"this road"}{dist}</div>
                   </div>
                   <span style={{color:"rgba(255,255,255,0.4)",fontSize:18}}>›</span>
                 </div>
-                {/* Alternative route action strip */}
-                {altRouteGeometry ? (
-                  <div style={{background:"rgba(37,99,235,0.15)",border:"1px solid rgba(59,130,246,0.35)",borderTop:"none",borderRadius:"0 0 16px 16px",padding:"11px 16px",display:"flex",alignItems:"center",gap:10}}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{flexShrink:0}}>
-                      <path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span style={{fontSize:12,color:"#93C5FD",fontWeight:600,flex:1}}>Alternative route shown in blue</span>
-                    <button onClick={()=>setAltRouteGeometry(null)}
-                      style={{background:"none",border:"none",color:"rgba(147,197,253,0.5)",fontSize:18,lineHeight:1,fontFamily:"inherit",cursor:"pointer"}}>×</button>
-                  </div>
-                ) : (
-                  <button onClick={fetchAltRoute} disabled={loadingAlt||!routeGeometry}
-                    style={{width:"100%",background:"rgba(30,58,138,0.4)",border:"1px solid rgba(59,130,246,0.3)",borderTop:"none",borderRadius:"0 0 16px 16px",padding:"11px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit",cursor:"pointer",opacity:loadingAlt?0.6:1}}>
-                    {loadingAlt
-                      ? <><div style={{width:10,height:10,border:"1.5px solid #3B82F6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/><span style={{color:"#93C5FD",fontSize:12,fontWeight:600}}>Finding alternative…</span></>
-                      : <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{color:"#3B82F6",fontSize:12,fontWeight:700}}>Show Alternative Route</span></>
-                    }
-                  </button>
-                )}
               </div>
             );
           })()}
@@ -1392,8 +1374,37 @@ export default function PublicPage() {
               )}
             </div>
 
-            <div style={{background:th.bg2,borderRadius:16,overflow:"hidden"}}>
-              {loading&&[0,1,2].map(i=><SkeletonItem key={i}/>)}
+            {/* Alternative route strip — moved here, below section header */}
+            {routeGeometry&&(
+              <div style={{marginBottom:10}}>
+                {altRouteGeometry?(
+                  <div style={{background:"rgba(37,99,235,0.12)",border:"1px solid rgba(59,130,246,0.28)",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{flexShrink:0}}><path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <span style={{fontSize:12,color:"#93C5FD",fontWeight:600,flex:1}}>Alternative route shown in blue</span>
+                    <button onClick={()=>setAltRouteGeometry(null)} style={{background:"none",border:"none",color:"rgba(147,197,253,0.4)",fontSize:18,lineHeight:1,fontFamily:"inherit"}}>×</button>
+                  </div>
+                ):(
+                  <button onClick={fetchAltRoute} disabled={loadingAlt}
+                    style={{width:"100%",background:"rgba(30,58,138,0.35)",border:"1px solid rgba(59,130,246,0.28)",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit",opacity:loadingAlt?0.6:1}}>
+                    {loadingAlt
+                      ?<><div style={{width:10,height:10,border:"1.5px solid #3B82F6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/><span style={{color:"#93C5FD",fontSize:12,fontWeight:600}}>Finding alternative…</span></>
+                      :<><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{color:"#3B82F6",fontSize:12,fontWeight:700}}>Show Alternative Route</span></>
+                    }
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div style={{background:th.bg2,borderRadius:18,overflow:"hidden",border:`1px solid ${th.b1}`}}>
+              {loading&&[0,1,2].map(i=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px",borderBottom:`0.5px solid ${th.b1}`}}>
+                  <div style={{width:9,height:9,borderRadius:"50%",background:th.b1,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{height:13,width:"50%",borderRadius:4,background:th.b1,marginBottom:7}}/>
+                    <div style={{height:11,width:"72%",borderRadius:4,background:th.b2}}/>
+                  </div>
+                </div>
+              ))}
               {!loading&&(()=>{
                 const items=routeResult??feedReports;
                 const shown=feedExpanded?items:items.slice(0,3);
@@ -1401,16 +1412,26 @@ export default function PublicPage() {
                   <div style={{padding:"32px",textAlign:"center" as const,color:th.t4,fontSize:13}}>No hazards found.</div>
                 );
                 return shown.map((r:any,i:number)=>{
-                  const sevColor=r.severity==="CRITICAL"?"#EF4444":r.severity==="HIGH"?"#888":"#555";
+                  const h=hMeta(r.hazardType);
+                  const isCrit=r.severity==="CRITICAL";
+                  const isHigh=r.severity==="HIGH";
+                  const sevColor=isCrit?"#EF4444":isHigh?"#F97316":r.severity==="MEDIUM"?"#F59E0B":"#888";
+                  const distStr=r._dist!=null?` · ${fmtDist(r._dist)} ahead`:"";
                   return(
                     <button key={r.id} onClick={()=>setSheetReport(r)}
                       style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"15px 16px",background:"none",border:"none",borderBottom:i<shown.length-1?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
-                      <div style={{width:9,height:9,borderRadius:"50%",background:r.severity==="CRITICAL"?"#EF4444":"#444",flexShrink:0}}/>
+                      <div style={{
+                        width:9,height:9,borderRadius:"50%",flexShrink:0,
+                        background:isCrit?"#EF4444":isHigh?"#2a2a2a":"#1a1a1a",
+                        boxShadow:isCrit?"0 0 7px rgba(239,68,68,0.55)":undefined,
+                      }}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:15,fontWeight:600,color:th.t1,marginBottom:3}}>{r.address||hMeta(r.hazardType).label}</div>
-                        <div style={{fontSize:12,color:th.t3}}>
+                        <div style={{fontSize:15,fontWeight:isCrit?700:600,color:isCrit?th.t1:th.t2,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
+                          {r.address||h.label}
+                        </div>
+                        <div style={{fontSize:12,color:th.t3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
                           <span style={{color:sevColor,fontWeight:600}}>{SEV_LABEL[r.severity]}</span>
-                          {" · "}{hMeta(r.hazardType).label}{r._dist!=null?` · ${fmtDist(r._dist)} ahead`:""}
+                          {" · "}{h.label}{distStr}
                         </div>
                       </div>
                       <span style={{color:th.t4,fontSize:18,flexShrink:0}}>›</span>
