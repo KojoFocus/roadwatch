@@ -598,6 +598,112 @@ export default function DashboardPage() {
           </>
         )}
 
+        {/* ── FLEET TAB ── */}
+        {!loading&&tab==="fleet"&&(()=>{
+          const now    = Date.now();
+          const weekMs = 7*86400000;
+          const active = reports.filter(r=>r.status!=="RESOLVED"&&r.status!=="DISMISSED");
+
+          const byCorr = AREAS
+            .map(a=>({
+              id:   a.id,
+              name: a.name,
+              total:active.filter(r=>r.areaId===a.id).length,
+              crit: active.filter(r=>r.areaId===a.id&&r.severity==="CRITICAL").length,
+            }))
+            .filter(x=>x.total>0)
+            .sort((a,b)=>b.crit-a.crit||b.total-a.total)
+            .slice(0,8);
+
+          const maxCorr = Math.max(...byCorr.map(x=>x.total),1);
+
+          const bySev = (["CRITICAL","HIGH","MEDIUM","LOW"] as const).map(s=>({
+            s,
+            count:active.filter(r=>r.severity===s).length,
+          }));
+          const maxSev = Math.max(...bySev.map(x=>x.count),1);
+
+          const critThisWeek = reports
+            .filter(r=>r.severity==="CRITICAL"&&r.status!=="DISMISSED"&&now-new Date(r.createdAt).getTime()<weekMs)
+            .sort((a,b)=>(SO[a.severity]??9)-(SO[b.severity]??9))
+            .slice(0,5);
+
+          return (
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>
+                {[
+                  {l:"ACTIVE",    v:active.length,                                          c:"#F97316"},
+                  {l:"CRITICAL",  v:active.filter(r=>r.severity==="CRITICAL").length,        c:"#EF4444"},
+                  {l:"CORRIDORS", v:byCorr.length,                                           c:"#60A5FA"},
+                ].map(x=>(
+                  <div key={x.l} style={{background:"#0C0C0C",border:"1px solid #111",borderRadius:13,padding:"12px 10px",textAlign:"center" as const}}>
+                    <div style={{fontSize:8,fontWeight:800,letterSpacing:1.5,color:"#2a2a2a",marginBottom:4}}>{x.l}</div>
+                    <div style={{color:x.c,fontSize:24,fontWeight:900,lineHeight:1}}>{x.v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {byCorr.length>0&&(
+                <div style={{background:"#0C0C0C",border:"1px solid #111",borderRadius:13,padding:"14px",marginBottom:8}}>
+                  <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:"#2a2a2a",marginBottom:10}}>CORRIDORS — ACTIVE HAZARDS</div>
+                  {byCorr.map((x,i)=>(
+                    <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+                      <span style={{color:"#1e1e1e",fontSize:11,width:14,textAlign:"right" as const,flexShrink:0}}>{i+1}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                          <span style={{color:"#555",fontSize:11,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>{x.name}</span>
+                          {x.crit>0&&<span style={{color:"#EF4444",fontSize:10,fontWeight:800,flexShrink:0,marginLeft:4}}>●{x.crit}</span>}
+                        </div>
+                        <div style={{height:4,background:"#111",borderRadius:2}}>
+                          <div style={{height:4,background:x.crit>0?"#EF4444":"#F97316",borderRadius:2,width:`${(x.total/maxCorr)*100}%`,opacity:x.crit>0?1:0.6}}/>
+                        </div>
+                      </div>
+                      <span style={{color:"#333",fontSize:12,fontWeight:700,flexShrink:0}}>{x.total}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{background:"#0C0C0C",border:"1px solid #111",borderRadius:13,padding:"14px",marginBottom:8}}>
+                <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:"#2a2a2a",marginBottom:10}}>BY SEVERITY</div>
+                {bySev.filter(x=>x.count>0).map(x=>(
+                  <div key={x.s} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:SC[x.s],display:"inline-block",flexShrink:0}}/>
+                    <span style={{color:"#555",fontSize:11,width:58,flexShrink:0}}>{SEV[x.s].label}</span>
+                    <div style={{flex:1,height:5,background:"#111",borderRadius:2}}>
+                      <div style={{height:5,background:SC[x.s],borderRadius:2,width:`${(x.count/maxSev)*100}%`,opacity:.85}}/>
+                    </div>
+                    <span style={{color:"#333",fontSize:12,fontWeight:700,flexShrink:0}}>{x.count}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{background:"#0C0C0C",border:"1px solid #111",borderRadius:13,padding:"14px"}}>
+                <div style={{fontSize:9,fontWeight:800,letterSpacing:2,color:"#2a2a2a",marginBottom:10}}>CRITICAL THIS WEEK</div>
+                {critThisWeek.length===0
+                  ?<div style={{color:"#1e1e1e",fontSize:12,textAlign:"center" as const,padding:"12px 0"}}>No critical hazards this week</div>
+                  :critThisWeek.map(r=>{
+                    const h=hMeta(r.hazardType);
+                    return(
+                      <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,paddingBottom:8,borderBottom:"1px solid #0F0F0F",cursor:"pointer"}} onClick={()=>setSelected(r)}>
+                        <span style={{fontSize:18,flexShrink:0}}>{h.e}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{color:"#555",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>{r.address}{r.landmark?` · ${r.landmark}`:""}</div>
+                          <div style={{color:"#1e1e1e",fontSize:10,marginTop:2}}>{r.region||r.areaId||""}{r.region?` · `:""}{ ago(r.createdAt)} ago</div>
+                        </div>
+                        <div style={{flexShrink:0,textAlign:"right" as const}}>
+                          <div style={{fontSize:9,fontWeight:800,color:ST[r.status]?.c||"#555",letterSpacing:.5}}>{ST[r.status]?.label||r.status}</div>
+                          {(r.upvoteCount||0)>0&&<div style={{color:"#444",fontSize:9,marginTop:2}}>{r.upvoteCount} confirms</div>}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── STATS TAB ── */}
         {!loading&&tab==="analytics"&&(()=>{
           const now    = Date.now();
@@ -697,7 +803,7 @@ export default function DashboardPage() {
 
       {/* Bottom nav — 4 tabs */}
       <div style={{position:"fixed" as const,bottom:0,left:0,right:0,background:"rgba(5,5,5,0.97)",borderTop:"1px solid #0F0F0F",padding:"9px 0 20px",display:"flex",justifyContent:"space-around",backdropFilter:"blur(20px)",zIndex:99}}>
-        {[["feed","📋","Feed"],["map","🗺️","Map"],["announce","📢","Alerts"],["analytics","📊","Stats"]].map(([key,icon,label])=>(
+        {[["feed","📋","Feed"],["map","🗺️","Map"],["announce","📢","Alerts"],["analytics","📊","Stats"],["fleet","🚛","Fleet"]].map(([key,icon,label])=>(
           <button key={key} onClick={()=>setTab(key)} style={{background:"none",border:"none",display:"flex",flexDirection:"column" as const,alignItems:"center",gap:2,fontFamily:"inherit",minWidth:60,position:"relative" as const}}>
             <span style={{fontSize:21}}>{icon}</span>
             <span style={{fontSize:8,fontWeight:900,letterSpacing:.8,color:tab===key?"#EF4444":"#1e1e1e"}}>{label.toUpperCase()}</span>
