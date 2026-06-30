@@ -1351,7 +1351,7 @@ export default function PublicPage() {
           })()}
 
           {/* Map — edge to edge */}
-          <div style={{height:300,margin:"14px 0 0",position:"relative" as const}}>
+          <div style={{height:260,margin:"14px 0 0",position:"relative" as const}}>
             <MapView reports={routeResult??reports} hazardFilter="All" onConfirm={doConfirm} confirmed={confirmed} lockView routeGeometry={routeGeometry} altRouteGeometry={altRouteGeometry}/>
           </div>
 
@@ -1368,7 +1368,7 @@ export default function PublicPage() {
               </div>
               {(routeResult??feedReports).length>3&&(
                 <button onClick={()=>setFeedExpanded(p=>!p)}
-                  style={{background:"none",border:"none",color:"#EF4444",fontSize:13,fontWeight:700,fontFamily:"inherit",display:"flex",alignItems:"center",gap:2}}>
+                  style={{background:"none",border:"none",outline:"none",color:"#EF4444",fontSize:13,fontWeight:700,fontFamily:"inherit",display:"flex",alignItems:"center",gap:2}}>
                   {feedExpanded?"Less":"See all"} <span style={{fontSize:16,lineHeight:1}}>›</span>
                 </button>
               )}
@@ -1395,13 +1395,13 @@ export default function PublicPage() {
               </div>
             )}
 
-            <div style={{background:th.bg2,borderRadius:18,overflow:"hidden",border:`1px solid ${th.b1}`}}>
+            <div style={{background:"#111",borderRadius:18,overflow:"hidden",border:"1px solid #1e1e1e"}}>
               {loading&&[0,1,2].map(i=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px",borderBottom:`0.5px solid ${th.b1}`}}>
-                  <div style={{width:9,height:9,borderRadius:"50%",background:th.b1,flexShrink:0}}/>
+                <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px",borderBottom:"0.5px solid #1a1a1a"}}>
+                  <div style={{width:9,height:9,borderRadius:"50%",background:"#222",flexShrink:0}}/>
                   <div style={{flex:1}}>
-                    <div style={{height:13,width:"50%",borderRadius:4,background:th.b1,marginBottom:7}}/>
-                    <div style={{height:11,width:"72%",borderRadius:4,background:th.b2}}/>
+                    <div style={{height:13,width:"50%",borderRadius:4,background:"#1e1e1e",marginBottom:7}}/>
+                    <div style={{height:11,width:"72%",borderRadius:4,background:"#191919"}}/>
                   </div>
                 </div>
               ))}
@@ -1409,32 +1409,32 @@ export default function PublicPage() {
                 const items=routeResult??feedReports;
                 const shown=feedExpanded?items:items.slice(0,3);
                 if(shown.length===0) return(
-                  <div style={{padding:"32px",textAlign:"center" as const,color:th.t4,fontSize:13}}>No hazards found.</div>
+                  <div style={{padding:"32px",textAlign:"center" as const,color:"#333",fontSize:13}}>No hazards found.</div>
                 );
                 return shown.map((r:any,i:number)=>{
                   const h=hMeta(r.hazardType);
                   const isCrit=r.severity==="CRITICAL";
                   const isHigh=r.severity==="HIGH";
-                  const sevColor=isCrit?"#EF4444":isHigh?"#F97316":r.severity==="MEDIUM"?"#F59E0B":"#888";
+                  const sevColor=isCrit?"#EF4444":isHigh?"#F97316":r.severity==="MEDIUM"?"#F59E0B":"#6B7280";
                   const distStr=r._dist!=null?` · ${fmtDist(r._dist)} ahead`:"";
                   return(
                     <button key={r.id} onClick={()=>setSheetReport(r)}
-                      style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"15px 16px",background:"none",border:"none",borderBottom:i<shown.length-1?`0.5px solid ${th.b1}`:"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"15px 16px",background:"none",border:"none",outline:"none",borderBottom:i<shown.length-1?"0.5px solid #1a1a1a":"none",fontFamily:"inherit",textAlign:"left" as const,cursor:"pointer"}}>
                       <div style={{
                         width:9,height:9,borderRadius:"50%",flexShrink:0,
-                        background:isCrit?"#EF4444":isHigh?"#2a2a2a":"#1a1a1a",
+                        background:isCrit?"#EF4444":"#3a3a3a",
                         boxShadow:isCrit?"0 0 7px rgba(239,68,68,0.55)":undefined,
                       }}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:15,fontWeight:isCrit?700:600,color:isCrit?th.t1:th.t2,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
+                        <div style={{fontSize:15,fontWeight:isCrit?700:500,color:"#e5e5e5",marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
                           {r.address||h.label}
                         </div>
-                        <div style={{fontSize:12,color:th.t3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
+                        <div style={{fontSize:12,color:"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" as const}}>
                           <span style={{color:sevColor,fontWeight:600}}>{SEV_LABEL[r.severity]}</span>
                           {" · "}{h.label}{distStr}
                         </div>
                       </div>
-                      <span style={{color:th.t4,fontSize:18,flexShrink:0}}>›</span>
+                      <span style={{color:"#2a2a2a",fontSize:18,flexShrink:0}}>›</span>
                     </button>
                   );
                 });
