@@ -1,7 +1,10 @@
 import { PrismaClient, HazardType, Severity, ReportStatus } from "@prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import { Pool } from "@neondatabase/serverless";
 import bcrypt from "bcryptjs";
 
-const db = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+const db   = new PrismaClient({ adapter: new PrismaNeon(pool) });
 
 function rnd(min: number, max: number) { return Math.random() * (max - min) + min; }
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
